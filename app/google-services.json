@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "779320558810",
+    "project_id": "future-minds-e7e0f",
+    "storage_bucket": "future-minds-e7e0f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:779320558810:android:5b9afff4c5fc3b088611e3",
+        "android_client_info": {
+          "package_name": "com.example.future_minds"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCT-tKxkOnA8AgvfbAwrfdPpFwBeRvjj-4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -16,6 +16,9 @@ import android.view.LayoutInflater
 import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
+import android.util.Log
+import com.google.firebase.firestore.FirebaseFirestore
+import java.util.Date
 
 class MainActivity : AppCompatActivity() {
 
@@ -41,10 +44,9 @@ class MainActivity : AppCompatActivity() {
 
         // 3. Set the Starting Point
         val mapController = map.controller
-        mapController.setZoom(18.0) // 18 is good for walking (very close up)
+        mapController.setZoom(15.0)
 
-        // Example: Start in New York (You will eventually get this from GPS)
-        val startPoint = GeoPoint(40.7128, -74.0060)
+        val startPoint = GeoPoint(44.420483, 26.061319)
         mapController.setCenter(startPoint)
 
 
@@ -68,7 +70,50 @@ class MainActivity : AppCompatActivity() {
         // 2. Add the Receiver to the Map as an Overlay
         val eventsOverlay = MapEventsOverlay(mapEventsReceiver)
         map.overlays.add(eventsOverlay)
+        listenForDangerZones()
 
+    }
+
+
+
+
+
+
+    private fun listenForDangerZones() {
+        val db = FirebaseFirestore.getInstance()
+
+        // "reports" must match the collection name you used in saveReportToDatabase
+        db.collection("reports")
+            .addSnapshotListener { snapshots, e ->
+                if (e != null) {
+                    Log.w("Firestore", "Listen failed.", e)
+                    return@addSnapshotListener
+                }
+
+                if (snapshots != null) {
+                    // Optional: Clear old overlays here if you want to avoid duplicates
+                    // map.overlays.clear()
+                    // (But be careful, this removes the map events receiver too!
+                    //  For V1, let's just draw on top.)
+
+                    for (document in snapshots) {
+                        // 1. Get the data from the cloud
+                        val lat = document.getDouble("lat") ?: 0.0
+                        val lng = document.getDouble("lng") ?: 0.0
+                        val radius = document.getDouble("radius") ?: 20.0
+                        val type = document.getString("type") ?: "General Hazard"
+
+                        // 2. Create the GeoPoint
+                        val point = GeoPoint(lat, lng)
+
+                        // 3. Draw it on the map!
+                        addDangerZoneToMap(point, radius, type)
+                    }
+
+                    // Refresh map to show new circles
+                    map.invalidate()
+                }
+            }
     }
 
 
@@ -154,17 +199,25 @@ class MainActivity : AppCompatActivity() {
 
     // 4. Updated Database Function
     private fun saveReportToDatabase(point: GeoPoint, radius: Double, type: String) {
+        val db = FirebaseFirestore.getInstance()
         // This is where you send the structured data to Firebase
-        val reportData = hashMapOf(
+        val report = hashMapOf(
             "lat" to point.latitude,
             "lng" to point.longitude,
             "radius" to radius,
             "type" to type,
-            "timestamp" to System.currentTimeMillis()
+            "timestamp" to Date() // Adds the current time
         )
-
-        // Example: db.collection("reports").add(reportData)
-        println("Saving Report: $type with radius $radius at ${point.latitude}")
+        db.collection("reports")
+            .add(report)
+            .addOnSuccessListener { documentReference ->
+                Log.d("Firestore", "DocumentSnapshot added with ID: ${documentReference.id}")
+                Toast.makeText(this, "Report Saved to Cloud!", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Log.w("Firestore", "Error adding document", e)
+                Toast.makeText(this, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
     }
 
 

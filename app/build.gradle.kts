@@ -59,4 +59,9 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")     // For Login
     implementation("com.google.firebase:firebase-firestore")
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // We also need a JSON parser to read the result
+    implementation("org.json:json:20231013")
 }

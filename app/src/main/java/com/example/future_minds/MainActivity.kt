@@ -19,14 +19,37 @@ import android.widget.TextView
 import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.Date
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import android.location.Geocoder
+import android.widget.AutoCompleteTextView
+import android.widget.ImageButton
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var map: MapView
+    private lateinit var locationSearch: LocationSearch
+    private lateinit var routeManager: RouteManager
+    private var badZonesList = mutableListOf<Map<String, Any>>()
+    private lateinit var locationOverlay: MyLocationNewOverlay
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                // Permission granted: Turn on the blue dot
+                setupLocationOverlay()
+            } else {
+                // Permission denied: Show a message
+                Toast.makeText(this, "Location permission is required for navigation!", Toast.LENGTH_LONG).show()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         // 1. IMPORTANT: Initialize OSMDroid Configuration
         // This handles caching and User-Agent to prevent getting banned by OSM servers
         Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this))
@@ -49,6 +72,8 @@ class MainActivity : AppCompatActivity() {
         val startPoint = GeoPoint(44.420483, 26.061319)
         mapController.setCenter(startPoint)
 
+        routeManager = RouteManager(this, map)
+
 
 
         val mapEventsReceiver = object : MapEventsReceiver {
@@ -70,7 +95,19 @@ class MainActivity : AppCompatActivity() {
         // 2. Add the Receiver to the Map as an Overlay
         val eventsOverlay = MapEventsOverlay(mapEventsReceiver)
         map.overlays.add(eventsOverlay)
+
+
+        val searchBar = findViewById<AutoCompleteTextView>(R.id.search_bar)
+        val searchButton = findViewById<ImageButton>(R.id.btn_search)
+
+        locationSearch = LocationSearch(this, map, searchBar, searchButton)
+
         listenForDangerZones()
+        checkLocationPermission()
+        routeManager = RouteManager(this, map)
+
+
+
 
     }
 
@@ -79,41 +116,62 @@ class MainActivity : AppCompatActivity() {
 
 
 
+    private fun checkLocationPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            // We already have permission!
+            setupLocationOverlay()
+        } else {
+            // We need to ask for it
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+
+
+    private fun setupLocationOverlay() {
+        // 4. Create the "Blue Dot" Overlay
+        // GpsMyLocationProvider uses the phone's GPS automatically
+        locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(this), map)
+
+        // Enable it
+        locationOverlay.enableMyLocation()
+
+        // Optional: Follow the user (move map as they walk)
+        // locationOverlay.enableFollowLocation()
+
+        // Add to map
+        map.overlays.add(locationOverlay)
+
+        // Refresh map
+        map.invalidate()
+    }
+
+
+
     private fun listenForDangerZones() {
         val db = FirebaseFirestore.getInstance()
+        db.collection("reports").addSnapshotListener { snapshots, e ->
+            if (snapshots != null) {
+                badZonesList.clear() // Clear old list
 
-        // "reports" must match the collection name you used in saveReportToDatabase
-        db.collection("reports")
-            .addSnapshotListener { snapshots, e ->
-                if (e != null) {
-                    Log.w("Firestore", "Listen failed.", e)
-                    return@addSnapshotListener
-                }
+                for (document in snapshots) {
+                    val lat = document.getDouble("lat") ?: 0.0
+                    val lng = document.getDouble("lng") ?: 0.0
+                    val radius = document.getDouble("radius") ?: 20.0
 
-                if (snapshots != null) {
-                    // Optional: Clear old overlays here if you want to avoid duplicates
-                    // map.overlays.clear()
-                    // (But be careful, this removes the map events receiver too!
-                    //  For V1, let's just draw on top.)
+                    // Add to our list for the routing engine
+                    val zoneData = mapOf(
+                        "lat" to lat,
+                        "lng" to lng,
+                        "radius" to radius
+                    )
+                    badZonesList.add(zoneData)
 
-                    for (document in snapshots) {
-                        // 1. Get the data from the cloud
-                        val lat = document.getDouble("lat") ?: 0.0
-                        val lng = document.getDouble("lng") ?: 0.0
-                        val radius = document.getDouble("radius") ?: 20.0
-                        val type = document.getString("type") ?: "General Hazard"
-
-                        // 2. Create the GeoPoint
-                        val point = GeoPoint(lat, lng)
-
-                        // 3. Draw it on the map!
-                        addDangerZoneToMap(point, radius, type)
-                    }
-
-                    // Refresh map to show new circles
-                    map.invalidate()
+                    // Draw on map (keep your existing visual code here)
+                    addDangerZoneToMap(GeoPoint(lat, lng), radius, "Danger")
                 }
             }
+        }
     }
 
 
@@ -222,15 +280,88 @@ class MainActivity : AppCompatActivity() {
 
 
 
+    private fun searchLocation(query: String) {
+        if (query.isEmpty()) return
+
+        // Geocoding needs to run on a background thread to not freeze the app
+        Thread {
+            try {
+                val geocoder = Geocoder(this, Locale.getDefault())
+
+                // Get top 1 result
+                // Note: In newer Android versions, this requires a listener,
+                // but this synchronous method works fine for simple use cases.
+                val results = geocoder.getFromLocationName(query, 4)
+
+                if (results != null && results.isNotEmpty()) {
+                    val location = results[0]
+                    val geoPoint = GeoPoint(location.latitude, location.longitude)
+
+                    // Update UI on the main thread
+                    runOnUiThread {
+                        // Move map to the location
+                        map.controller.animateTo(geoPoint)
+                        map.controller.setZoom(18.0)
+
+                        // Optional: Show a marker
+                        addMarker(geoPoint, query)
+
+                        Toast.makeText(this, "Found: ${location.featureName ?: query}", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    runOnUiThread {
+                        Toast.makeText(this, "Location not found", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                runOnUiThread {
+                    Toast.makeText(this, "Search error: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
+    }
+    private fun addMarker(point: GeoPoint, title: String) {
+        val marker = org.osmdroid.views.overlay.Marker(map)
+        marker.position = point
+        marker.setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
+        marker.title = title
+        map.overlays.add(marker)
+        map.invalidate()
+    }
+
+
+
+    fun calculateSafeRoute(destination: GeoPoint) {
+        // 1. Find my current location (Blue Dot)
+        val myLocationOverlay = map.overlays.firstOrNull { it is MyLocationNewOverlay } as? MyLocationNewOverlay
+        val myLocation = myLocationOverlay?.myLocation
+
+        if (myLocation != null) {
+            Toast.makeText(this, "Calculating Safe Route...", Toast.LENGTH_SHORT).show()
+
+            // 2. Ask RouteManager to do the math
+            routeManager.getSafeRoute(myLocation, destination, badZonesList)
+        } else {
+            Toast.makeText(this, "Waiting for GPS... Try again in a moment.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
 
     // 4. Handle Lifecycle to prevent battery drain
     override fun onResume() {
         super.onResume()
         map.onResume()
+        if (::locationOverlay.isInitialized) {
+            locationOverlay.enableMyLocation()
+        }
     }
 
     override fun onPause() {
         super.onPause()
         map.onPause()
+        if (::locationOverlay.isInitialized) {
+            locationOverlay.disableMyLocation()
+        }
     }
 }

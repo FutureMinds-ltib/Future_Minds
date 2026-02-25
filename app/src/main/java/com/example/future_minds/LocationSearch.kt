@@ -29,6 +29,8 @@ class LocationSearch(
 ) {
 
     private var geocoder: Geocoder? = null
+    lateinit var pnt: GeoPoint
+    public  var pntBool: Boolean=false
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private var currentMarker: Marker? = null
@@ -106,7 +108,7 @@ class LocationSearch(
 
     private fun performSearch(query: String) {
         if (query.isEmpty() || geocoder == null) return
-        
+
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.hideSoftInputFromWindow(searchBar.windowToken, 0)
         searchBar.dismissDropDown()
@@ -135,7 +137,9 @@ class LocationSearch(
         }
     }
 
-    private fun zoomToLocation(point: GeoPoint, title: String) {
+    fun zoomToLocation(point: GeoPoint, title: String) {
+        pnt=point
+        pntBool=true
         map.controller.animateTo(point)
         map.controller.setZoom(17.0)
         currentMarker?.let { map.overlays.remove(it) }
@@ -145,12 +149,12 @@ class LocationSearch(
             this.title = title
             showInfoWindow()
         }
-        map.overlays.add(currentMarker)
+        map.overlays.add(1,currentMarker)
         map.invalidate()
 
-        if (context is MainActivity) {
-            context.calculateSafeRoute(point)
-        }
+//        if (context is MainActivity) {
+//            context.calculateSafeRoute(point)
+//        }
     }
 
     class AutoSuggestAdapter(context: Context, resource: Int) : ArrayAdapter<String>(context, resource), Filterable {

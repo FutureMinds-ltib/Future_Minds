@@ -1,6 +1,7 @@
 package com.example.future_minds
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -43,6 +44,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this))
@@ -52,26 +54,58 @@ class MainActivity : AppCompatActivity() {
         map.setTileSource(TileSourceFactory.MAPNIK)
         map.setMultiTouchControls(true)
 
+        var report_bool=false;
+        val report_btn= findViewById<Button>(R.id.button_report)
+        report_btn.setOnClickListener { report_bool=true }
+
+        val route_btn= findViewById<Button>(R.id.button_route)
+        route_btn.setOnClickListener {
+            if(locationSearch.pntBool) {
+                calculateSafeRoute(locationSearch.pnt)
+            }else Toast.makeText(this, "You must first select a place", Toast.LENGTH_LONG).show()
+        }
+
+        val modTestare= findViewById<Switch>(R.id.testare)
+        var testare_bool=false
+        modTestare?.setOnCheckedChangeListener({ _ , isChecked ->
+            if (isChecked) testare_bool=true else testare_bool=false
+        })
+
+
+
+
         val mapController = map.controller
         mapController.setZoom(15.0)
         val startPoint = GeoPoint(44.420483, 26.061319)
         mapController.setCenter(startPoint)
 
         routeManager = RouteManager(this, map)
+        val searchBar = findViewById<AutoCompleteTextView>(R.id.search_bar)
+        val searchButton = findViewById<ImageButton>(R.id.btn_search)
+        locationSearch = LocationSearch(this, map, searchBar, searchButton)
 
         // Setup Map Events (Long Press for reporting)
         val mapEventsReceiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
             override fun longPressHelper(p: GeoPoint?): Boolean {
-                p?.let { showReportDialog(it) }
+                p?.let {
+                    if(testare_bool){
+                        if(report_bool){
+                            showReportDialog(it)
+                            report_bool=false
+                        }else{
+                            locationSearch.zoomToLocation(p,"Pin")
+                        }
+                    }
+
+                }
                 return true
             }
         }
         map.overlays.add(MapEventsOverlay(mapEventsReceiver))
 
-        val searchBar = findViewById<AutoCompleteTextView>(R.id.search_bar)
-        val searchButton = findViewById<ImageButton>(R.id.btn_search)
-        locationSearch = LocationSearch(this, map, searchBar, searchButton)
+
+
 
         listenForDangerZones()
         checkLocationPermission()
@@ -93,6 +127,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun listenForDangerZones() {
+
         val db = FirebaseFirestore.getInstance()
         db.collection("reports").addSnapshotListener { snapshots, e ->
             if (e != null) {

@@ -1,169 +1,179 @@
-package com.example.future_minds // Update package name!
+package com.example.future_minds
 
 import android.content.Context
-import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
-import okhttp3.Call
-import okhttp3.Callback
+import androidx.core.graphics.toColorInt
+import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Polyline
 import java.io.IOException
+import java.util.Locale
+import kotlin.math.*
 
 class RouteManager(private val context: Context, private val map: MapView) {
 
     private val client = OkHttpClient()
-    // TODO: PASTE YOUR API KEY HERE
     private val apiKey = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjFhYzIyMDdmMDlhMjRjZmM4YmYwZjVhMDIxNzg2OWJmIiwiaCI6Im11cm11cjY0In0="
+    
+    private var safeRouteOverlay: Polyline? = null
+    private var fastRouteOverlay: Polyline? = null
 
-    private var currentRouteOverlay: Polyline? = null
-
-    // The main function to calculate the path
     fun getSafeRoute(start: GeoPoint, end: GeoPoint, badZones: List<Map<String, Any>>) {
+        // Clear previous routes
+        clearRoutes()
 
-        // 1. Prepare the JSON Body
+        val distanceKm = calculateDistance(start, end)
+        if (distanceKm > 100) {
+            showToast("Destination too far: ${String.format(Locale.US, "%.1f", distanceKm)} km")
+            return
+        }
+
+        // 1. Fetch the Fast (Risky) Route
+        fetchRoute(start, end, emptyList(), isSafeAttempt = false)
+
+        // 2. Fetch the Safe Route (only if there are zones to avoid)
+        if (badZones.isNotEmpty()) {
+            fetchRoute(start, end, badZones, isSafeAttempt = true)
+        }
+    }
+
+    private fun clearRoutes() {
+        safeRouteOverlay?.let { map.overlays.remove(it) }
+        fastRouteOverlay?.let { map.overlays.remove(it) }
+        safeRouteOverlay = null
+        fastRouteOverlay = null
+        map.invalidate()
+    }
+
+    private fun fetchRoute(start: GeoPoint, end: GeoPoint, badZones: List<Map<String, Any>>, isSafeAttempt: Boolean) {
         val jsonBody = JSONObject()
-
-        // Coordinates: ORS expects [Longitude, Latitude]
-        val coordinates = JSONArray()
-        coordinates.put(JSONArray().put(start.longitude).put(start.latitude))
-        coordinates.put(JSONArray().put(end.longitude).put(end.latitude))
+        val coordinates = JSONArray().apply {
+            put(JSONArray().put(start.longitude).put(start.latitude))
+            put(JSONArray().put(end.longitude).put(end.latitude))
+        }
         jsonBody.put("coordinates", coordinates)
 
-        // 2. Add Avoidance Zones (THE FIXED PART)
-        if (badZones.isNotEmpty()) {
+        if (isSafeAttempt && badZones.isNotEmpty()) {
             val options = JSONObject()
-            val avoidPolygons = JSONObject()
-
-            // REQUIRED: Tell ORS this is a "MultiPolygon"
-            avoidPolygons.put("type", "MultiPolygon")
-
-            val multiPolygonCoordinates = JSONArray()
-
-            for (zone in badZones) {
-                // Safely get data
-                val lat = (zone["lat"] as? Number)?.toDouble() ?: continue
-                val lng = (zone["lng"] as? Number)?.toDouble() ?: continue
-
-                // Radius: 0.0003 degrees is roughly 30 meters
-                val r = 0.0003
-
-                // A single Polygon in GeoJSON is an array of rings (usually just one ring)
-                val polygonRing = JSONArray()
-
-                // Top Right
-                polygonRing.put(JSONArray().put(lng + r).put(lat + r))
-                // Bottom Right
-                polygonRing.put(JSONArray().put(lng + r).put(lat - r))
-                // Bottom Left
-                polygonRing.put(JSONArray().put(lng - r).put(lat - r))
-                // Top Left
-                polygonRing.put(JSONArray().put(lng - r).put(lat + r))
-                // Close the loop (Must be same as first point)
-                polygonRing.put(JSONArray().put(lng + r).put(lat + r))
-
-                // Wrap the ring in a container (because polygons can have holes)
-                val polygonContainer = JSONArray()
-                polygonContainer.put(polygonRing)
-
-                // Add to the list of polygons
-                multiPolygonCoordinates.put(polygonContainer)
+            val avoidPolygons = JSONObject().apply {
+                put("type", "MultiPolygon")
+                val multiPolygonCoordinates = JSONArray()
+                for (zone in badZones) {
+                    val lat = (zone["lat"] as? Number)?.toDouble() ?: continue
+                    val lng = (zone["lng"] as? Number)?.toDouble() ?: continue
+                    val radius = (zone["radius"] as? Number)?.toDouble() ?: 20.0
+                    val latDeg = radius / 111320.0
+                    val lngDeg = radius / (111320.0 * cos(Math.toRadians(lat)))
+                    val ring = JSONArray()
+                    for (i in 0..8) {
+                        val angle = Math.toRadians(i * 45.0)
+                        ring.put(JSONArray().put(lng + lngDeg * cos(angle)).put(lat + latDeg * sin(angle)))
+                    }
+                    multiPolygonCoordinates.put(JSONArray().put(ring))
+                }
+                put("coordinates", multiPolygonCoordinates)
             }
-
-            // REQUIRED: The key must be "coordinates", not "polygons"
-            avoidPolygons.put("coordinates", multiPolygonCoordinates)
-
             options.put("avoid_polygons", avoidPolygons)
             jsonBody.put("options", options)
         }
 
-        // 3. Send the Request
-        // Log the JSON so we can debug if it happens again
-        android.util.Log.d("RouteManager", "Sending JSON: $jsonBody")
-
-        val mediaType = "application/json; charset=utf-8".toMediaType()
-        val body = jsonBody.toString().toRequestBody(mediaType)
-
+        val body = jsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
         val request = Request.Builder()
             .url("https://api.openrouteservice.org/v2/directions/foot-walking/geojson")
-            .post(body)
-            .addHeader("Authorization", apiKey) // Make sure API Key is set!
-            .build()
+            .post(body).addHeader("Authorization", apiKey).build()
 
         client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                showToast("Failed to connect: ${e.message}")
-            }
-
+            override fun onFailure(call: Call, e: IOException) { Log.e("RouteManager", "Network error", e) }
             override fun onResponse(call: Call, response: Response) {
-                if (response.isSuccessful) {
-                    val responseData = response.body?.string()
-                    if (responseData != null) {
-                        Handler(Looper.getMainLooper()).post {
-                            drawRouteOnMap(responseData)
-                        }
+                val data = response.body?.string()
+                if (response.isSuccessful && data != null) {
+                    Handler(Looper.getMainLooper()).post { 
+                        processAndDrawRoute(data, isSafeAttempt) 
                     }
-                } else {
-                    // Log the actual error message from the server
-                    val errorBody = response.body?.string()
-                    android.util.Log.e("RouteManager", "Server Error: $errorBody")
-                    showToast("Error ${response.code}: Check Logcat for details")
                 }
             }
         })
     }
 
-    private fun drawRouteOnMap(jsonString: String) {
+    private fun processAndDrawRoute(jsonString: String, isSafe: Boolean) {
         try {
-            // Remove old route
-            if (currentRouteOverlay != null) {
-                map.overlays.remove(currentRouteOverlay)
-            }
-
-            val json = JSONObject(jsonString)
-            val features = json.getJSONArray("features")
-            val geometry = features.getJSONObject(0).getJSONObject("geometry")
+            val feature = JSONObject(jsonString).getJSONArray("features").getJSONObject(0)
+            val geometry = feature.getJSONObject("geometry")
             val coords = geometry.getJSONArray("coordinates")
+            val properties = feature.getJSONObject("properties").getJSONObject("summary")
+            
+            val duration = properties.getDouble("duration") // in seconds
 
-            val routePoints = ArrayList<GeoPoint>()
-
+            val points = ArrayList<GeoPoint>()
             for (i in 0 until coords.length()) {
-                val point = coords.getJSONArray(i)
-                // GeoJSON is [Lon, Lat], OSMDroid needs [Lat, Lon]
-                val lon = point.getDouble(0)
-                val lat = point.getDouble(1)
-                routePoints.add(GeoPoint(lat, lon))
+                val p = coords.getJSONArray(i)
+                points.add(GeoPoint(p.getDouble(1), p.getDouble(0)))
             }
 
-            // Create the line
-            currentRouteOverlay = Polyline()
-            currentRouteOverlay?.setPoints(routePoints)
-            currentRouteOverlay?.outlinePaint?.color = Color.BLUE
-            currentRouteOverlay?.outlinePaint?.strokeWidth = 15f // Thick line
+            val polyline = Polyline(map)
+            polyline.setPoints(points)
+            
+            if (isSafe) {
+                polyline.outlinePaint.color = "#4CAF50".toColorInt() // Green for Safe
+                polyline.outlinePaint.strokeWidth = 14f
+                polyline.title = "Safe Route: ${formatTime(duration)}"
+                safeRouteOverlay = polyline
+            } else {
+                polyline.outlinePaint.color = "#F44336".toColorInt() // Red for Fast/Risky
+                polyline.outlinePaint.strokeWidth = 10f
+                // Make the risky route dashed
+                polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(20f, 20f), 0f)
+                polyline.title = "Fastest Route: ${formatTime(duration)}"
+                fastRouteOverlay = polyline
+            }
 
-            map.overlays.add(currentRouteOverlay)
+            map.overlays.add(polyline)
             map.invalidate()
 
-            showToast("Safe Route Calculated!")
+            // Optional: Comparison message
+            checkIfBothRoutesReady()
 
-        } catch (e: Exception) {
-            e.printStackTrace()
-            showToast("Error parsing route")
+        } catch (e: Exception) { Log.e("RouteManager", "Error parsing route", e) }
+    }
+
+    private fun checkIfBothRoutesReady() {
+        if (safeRouteOverlay != null && fastRouteOverlay != null) {
+            val safeTime = parseDuration(safeRouteOverlay?.title ?: "")
+            val fastTime = parseDuration(fastRouteOverlay?.title ?: "")
+            
+            if (safeTime > fastTime * 1.5) {
+                showToast("Note: Safe route is significantly longer. Fast route is shown in dashed red.")
+            }
         }
     }
 
-    private fun showToast(message: String) {
-        Handler(Looper.getMainLooper()).post {
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        }
+    private fun formatTime(seconds: Double): String {
+        val minutes = (seconds / 60).toInt()
+        return if (minutes < 1) "< 1 min" else "$minutes min"
+    }
+
+    private fun parseDuration(title: String): Int {
+        return title.filter { it.isDigit() }.toIntOrNull() ?: 0
+    }
+
+    private fun calculateDistance(p1: GeoPoint, p2: GeoPoint): Double {
+        val earthRadius = 6371.0
+        val dLat = Math.toRadians(p2.latitude - p1.latitude)
+        val dLon = Math.toRadians(p2.longitude - p1.longitude)
+        val a = sin(dLat / 2).pow(2) + cos(Math.toRadians(p1.latitude)) * cos(Math.toRadians(p2.latitude)) * sin(dLon / 2).pow(2)
+        return earthRadius * 2 * atan2(sqrt(a), sqrt(1 - a))
+    }
+
+    private fun showToast(msg: String) {
+        Handler(Looper.getMainLooper()).post { Toast.makeText(context, msg, Toast.LENGTH_LONG).show() }
     }
 }

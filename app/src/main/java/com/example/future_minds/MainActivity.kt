@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Point
 import android.location.Geocoder
 import android.os.Bundle
 import android.preference.PreferenceManager
@@ -15,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.firebase.firestore.FirebaseFirestore
+import okhttp3.internal.wait
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -25,6 +27,7 @@ import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import java.util.*
+import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
 
@@ -33,16 +36,21 @@ class MainActivity : AppCompatActivity() {
     private lateinit var routeManager: RouteManager
     private var badZonesList = mutableListOf<Map<String, Any>>()
     private var dangerZoneOverlays = mutableListOf<Polygon>()
-    private lateinit var locationOverlay: MyLocationNewOverlay
+    private var locationOverlay: MyLocationNewOverlay ?= null
 
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-                setupLocationOverlay()
-            } else {
-                Toast.makeText(this, "Location permission is required for navigation!", Toast.LENGTH_LONG).show()
+    private val locationPermissionRequest = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        when {
+            permissions.getOrDefault(android.Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
+                // Permission granted! Turn on the GPS.
+                setupUserLocation()
+            }
+            else -> {
+                android.widget.Toast.makeText(this, "Location permission is required to center the map.", android.widget.Toast.LENGTH_SHORT).show()
             }
         }
+    }
 
     @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,6 +61,7 @@ class MainActivity : AppCompatActivity() {
         map = findViewById(R.id.map)
         map.setTileSource(TileSourceFactory.MAPNIK)
         map.setMultiTouchControls(true)
+        map.setBuiltInZoomControls(false)
 
         var report_bool=false;
         val report_btn= findViewById<Button>(R.id.button_report)
@@ -66,9 +75,16 @@ class MainActivity : AppCompatActivity() {
         }
 
         val modTestare= findViewById<Switch>(R.id.testare)
-        var testare_bool=false
+        var testare_bool=true
         modTestare?.setOnCheckedChangeListener({ _ , isChecked ->
-            if (isChecked) testare_bool=true else testare_bool=false
+            if (!isChecked) {
+                testare_bool = true
+                map.setBuiltInZoomControls(false)
+            }
+            else {
+                testare_bool = false
+                map.setBuiltInZoomControls(true)
+            }
         })
 
 
@@ -76,8 +92,6 @@ class MainActivity : AppCompatActivity() {
 
         val mapController = map.controller
         mapController.setZoom(15.0)
-        val startPoint = GeoPoint(44.420483, 26.061319)
-        mapController.setCenter(startPoint)
 
         routeManager = RouteManager(this, map)
         val searchBar = findViewById<AutoCompleteTextView>(R.id.search_bar)
@@ -108,22 +122,28 @@ class MainActivity : AppCompatActivity() {
 
 
         listenForDangerZones()
-        checkLocationPermission()
+        locationPermissionRequest.launch(arrayOf(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ))
     }
 
-    private fun checkLocationPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            setupLocationOverlay()
-        } else {
-            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-    }
+    private fun setupUserLocation() {
+        // 1. Create the GPS tracker
+        val locationProvider = GpsMyLocationProvider(this)
+        locationOverlay = MyLocationNewOverlay(locationProvider, map)
 
-    private fun setupLocationOverlay() {
-        locationOverlay = MyLocationNewOverlay(GpsMyLocationProvider(this), map)
-        locationOverlay.enableMyLocation()
+        // 2. Turn it on and add it to the map
+        locationOverlay?.enableMyLocation()
         map.overlays.add(locationOverlay)
-        map.invalidate()
+
+        // 3. Wait for the very first GPS signal, then instantly zoom the map to it
+        locationOverlay?.runOnFirstFix {
+            runOnUiThread {
+                map.controller.setZoom(18.0) // 18.0 is a great street-level zoom
+                map.controller.animateTo(locationOverlay!!.myLocation)
+            }
+        }
     }
 
     private fun listenForDangerZones() {
@@ -231,7 +251,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun calculateSafeRoute(destination: GeoPoint) {
-        val myLocation = locationOverlay.myLocation
+        val myLocation = locationOverlay?.myLocation
         if (myLocation != null) {
             Toast.makeText(this, "Calculating Safe Route...", Toast.LENGTH_SHORT).show()
             routeManager.getSafeRoute(myLocation, destination, badZonesList)
@@ -243,12 +263,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         map.onResume()
-        if (::locationOverlay.isInitialized) locationOverlay.enableMyLocation()
+        locationOverlay?.enableMyLocation()
     }
 
     override fun onPause() {
         super.onPause()
         map.onPause()
-        if (::locationOverlay.isInitialized) locationOverlay.disableMyLocation()
+        locationOverlay?.disableMyLocation()
     }
 }

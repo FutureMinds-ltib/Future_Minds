@@ -22,14 +22,40 @@ class LoginActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
 
         // Check if user is already logged in
+
+
+        ///////////////////////////////////////////////////////////////
+        ///////////////SELECTATI CA SA NU TREBUIASCA SA////////////////
+         ///////////////TE LOGHEZI LA FIECARE DESCHIDERE///////////////
         if (auth.currentUser != null) {
             goToMapScreen()
         }
+        //////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////
 
         val etEmail = findViewById<EditText>(R.id.et_email)
         val etPassword = findViewById<EditText>(R.id.et_password)
         val btnLogin = findViewById<Button>(R.id.btn_login)
         val btnRegister = findViewById<Button>(R.id.btn_register)
+        val btnGuest = findViewById<Button>(R.id.btn_guest)
+
+        btnGuest.setOnClickListener {
+            goToMapScreen()
+            auth.signInAnonymously()
+                .addOnCompleteListener(this) { task ->
+                    if (task.isSuccessful) {
+                        // Success! Send them to the map.
+                        val intent = Intent(this, MainActivity::class.java)
+                        startActivity(intent)
+                        finish() // Closes the login screen so they can't press 'back' to return to it
+                    } else {
+                        // It failed (Usually because Anonymous Auth isn't enabled in Firebase Console)
+                        val errorMsg = task.exception?.message ?: "Unknown error"
+                        Toast.makeText(this, "Guest Login Failed: $errorMsg", Toast.LENGTH_LONG).show()
+                    }
+                }
+        }
 
         // Handle Login Click
         btnLogin.setOnClickListener {

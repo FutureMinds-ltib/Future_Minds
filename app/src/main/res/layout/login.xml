@@ -38,10 +38,18 @@
 
     <Button
         android:id="@+id/btn_register"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Create Account"
         android:layout_marginTop="8dp"
-        style="@style/Widget.MaterialComponents.Button.TextButton"/>
+        android:text="Create Account" />
+
+    <Button
+        android:id="@+id/btn_guest"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Continue as Guest"
+        style="@style/Widget.MaterialComponents.Button.TextButton" />
 
 </LinearLayout>

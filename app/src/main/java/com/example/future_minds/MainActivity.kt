@@ -94,7 +94,7 @@ class MainActivity : AppCompatActivity() {
                             showReportDialog(it)
                             report_bool=false
                         }else{
-                            locationSearch.zoomToLocation(p,"Pin")
+                            locationSearch.zoomToLocation(it,"Pin")
                         }
                     }
 

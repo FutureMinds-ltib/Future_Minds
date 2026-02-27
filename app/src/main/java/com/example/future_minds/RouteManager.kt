@@ -92,12 +92,75 @@ class RouteManager(private val context: Context, private val map: MapView) {
             .post(body).addHeader("Authorization", apiKey).build()
 
         client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) { Log.e("RouteManager", "Network error", e) }
+            override fun onFailure(call: Call, e: IOException) {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(context, "Network error: Check your internet connection.", Toast.LENGTH_SHORT).show()
+                }
+            }
+
             override fun onResponse(call: Call, response: Response) {
-                val data = response.body?.string()
-                if (response.isSuccessful && data != null) {
-                    Handler(Looper.getMainLooper()).post { 
-                        processAndDrawRoute(data, isSafeAttempt) 
+                if (response.isSuccessful) {
+                    val responseData = response.body?.string()
+                    if (responseData != null) {
+                        Handler(Looper.getMainLooper()).post {
+                            processAndDrawRoute(responseData,isSafeAttempt)
+                        }
+                    }
+                } else {
+                    val errorCode = response.code
+                    val errorBody = response.body?.string()
+                    android.util.Log.e("RouteManager", "API Error $errorCode: $errorBody")
+
+                    // Handle specific API limits and errors safely on the Main Thread
+                    Handler(Looper.getMainLooper()).post {
+                        var specificErrorMessage: String? = null
+                        if (errorBody != null) {
+                            try {
+                                val jsonError = org.json.JSONObject(errorBody)
+                                val errorObj = jsonError.optJSONObject("error")
+                                if (errorObj != null) {
+                                    val internalCode = errorObj.optInt("code")
+                                    val internalMessage = errorObj.optString("message", "")
+
+                                    // 2. Catch our specific profile bug
+                                    if (internalCode == 2003 && internalMessage.contains("profile")) {
+                                        specificErrorMessage = "The routing server is temporarily down. Please try again later."
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // If it's not valid JSON, just ignore and fall back to HTTP codes
+                                e.printStackTrace()
+                            }
+                        }
+                        if (specificErrorMessage != null) {
+                            Toast.makeText(context, specificErrorMessage, Toast.LENGTH_LONG).show()
+                        } else {
+                            when (errorCode) {
+                                429 -> Toast.makeText(
+                                    context,
+                                    "Server is busy (Too many requests). Try again in a minute!",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                400 -> Toast.makeText(
+                                    context,
+                                    "Route too long or impossible to calculate with current danger zones.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                404 -> Toast.makeText(
+                                    context,
+                                    "Could not find a valid walking route to that exact location.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                else -> Toast.makeText(
+                                    context,
+                                    "Routing failed (Error $errorCode).",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
                     }
                 }
             }

@@ -9,13 +9,21 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Welcome Back"
+        android:text="Create Account"
         android:textSize="24sp"
         android:textStyle="bold"
         android:layout_marginBottom="32dp"/>
 
     <EditText
-        android:id="@+id/et_email"
+        android:id="@+id/et_register_username"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Username"
+        android:inputType="textPersonName"
+        android:layout_marginBottom="16dp"/>
+
+    <EditText
+        android:id="@+id/et_register_email"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Email Address"
@@ -23,42 +31,33 @@
         android:layout_marginBottom="16dp"/>
 
     <EditText
-        android:id="@+id/et_password"
+        android:id="@+id/et_register_password"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Password"
         android:inputType="textPassword"
+        android:layout_marginBottom="16dp"/>
+
+    <EditText
+        android:id="@+id/et_register_phone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Phone Number"
+        android:inputType="phone"
         android:layout_marginBottom="24dp"/>
 
     <Button
-        android:id="@+id/btn_login"
+        android:id="@+id/btn_do_register"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Log In" />
+        android:text="Register" />
 
     <Button
-        android:id="@+id/btn_forgot_password"
+        android:id="@+id/btn_back_to_login_from_reg"
         style="@style/Widget.MaterialComponents.Button.TextButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="Forgot Password?"
-        android:textColor="#757575" />
-
-    <Button
-        android:id="@+id/btn_register"
-        style="@style/Widget.MaterialComponents.Button.TextButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="Create Account" />
-
-    <Button
-        android:id="@+id/btn_guest"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="Continue as Guest"
-        style="@style/Widget.MaterialComponents.Button.TextButton" />
+        android:text="Back to Login" />
 
 </LinearLayout>

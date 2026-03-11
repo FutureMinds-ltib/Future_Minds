@@ -1,4 +1,4 @@
-package com.example.future_minds // Make sure this matches your package name!
+package com.example.future_minds
 
 import android.content.Intent
 import android.os.Bundle
@@ -7,7 +7,6 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.FirebaseApp // <--- IMPORTANT IMPORT
 
 class LoginActivity : AppCompatActivity() {
 
@@ -15,42 +14,31 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        FirebaseApp.initializeApp(this)
         setContentView(R.layout.login)
 
-        // 2. Now it is safe to get the Auth instance
         auth = FirebaseAuth.getInstance()
 
-        // Check if user is already logged in
-
-
-        ///////////////////////////////////////////////////////////////
-        ///////////////SELECTATI CA SA NU TREBUIASCA SA////////////////
-         ///////////////TE LOGHEZI LA FIECARE DESCHIDERE///////////////
-        if (auth.currentUser != null) {
-            goToMapScreen()
+        // Verificam daca utilizatorul este logat SI daca are email-ul verificat (sau e Guest)
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            if (currentUser.isEmailVerified || currentUser.isAnonymous) {
+                goToMapScreen()
+            }
         }
-        //////////////////////////////////////////////////////////////
-        //////////////////////////////////////////////////////////////
-        //////////////////////////////////////////////////////////////
-
+        
         val etEmail = findViewById<EditText>(R.id.et_email)
         val etPassword = findViewById<EditText>(R.id.et_password)
         val btnLogin = findViewById<Button>(R.id.btn_login)
         val btnRegister = findViewById<Button>(R.id.btn_register)
         val btnGuest = findViewById<Button>(R.id.btn_guest)
+        val btnForgotPassword = findViewById<Button>(R.id.btn_forgot_password)
 
         btnGuest.setOnClickListener {
-            goToMapScreen()
             auth.signInAnonymously()
                 .addOnCompleteListener(this) { task ->
                     if (task.isSuccessful) {
-                        // Success! Send them to the map.
-                        val intent = Intent(this, MainActivity::class.java)
-                        startActivity(intent)
-                        finish() // Closes the login screen so they can't press 'back' to return to it
+                        goToMapScreen()
                     } else {
-                        // It failed (Usually because Anonymous Auth isn't enabled in Firebase Console)
                         val errorMsg = task.exception?.message ?: "Unknown error"
                         Toast.makeText(this, "Guest Login Failed: $errorMsg", Toast.LENGTH_LONG).show()
                     }
@@ -59,37 +47,38 @@ class LoginActivity : AppCompatActivity() {
 
         // Handle Login Click
         btnLogin.setOnClickListener {
-            val email = etEmail.text.toString()
-            val pass = etPassword.text.toString()
+            val email = etEmail.text.toString().trim()
+            val pass = etPassword.text.toString().trim()
 
             if (email.isNotEmpty() && pass.isNotEmpty()) {
                 auth.signInWithEmailAndPassword(email, pass)
                     .addOnCompleteListener(this) { task ->
                         if (task.isSuccessful) {
-                            goToMapScreen()
+                            val user = auth.currentUser
+                            if (user != null && user.isEmailVerified) {
+                                goToMapScreen()
+                            } else {
+                                Toast.makeText(this, "Vă rugăm să vă verificați adresa de email!", Toast.LENGTH_LONG).show()
+                                auth.signOut() // Îl scoatem afară până confirmă email-ul
+                            }
                         } else {
                             Toast.makeText(this, "Login Failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
                         }
                     }
+            } else {
+                Toast.makeText(this, "Completati toate campurile!", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // Handle Register Click
+        // Redirectionare către ecranul de înregistrare
         btnRegister.setOnClickListener {
-            val email = etEmail.text.toString()
-            val pass = etPassword.text.toString()
+            val intent = Intent(this@LoginActivity, RegisterActivity::class.java)
+            startActivity(intent)
+        }
 
-            if (email.isNotEmpty() && pass.isNotEmpty()) {
-                auth.createUserWithEmailAndPassword(email, pass)
-                    .addOnCompleteListener(this) { task ->
-                        if (task.isSuccessful) {
-                            Toast.makeText(this, "Account Created!", Toast.LENGTH_SHORT).show()
-                            goToMapScreen()
-                        } else {
-                            Toast.makeText(this, "Error: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-            }
+        btnForgotPassword.setOnClickListener {
+            val intent = Intent(this@LoginActivity, ForgotPasswordActivity::class.java)
+            startActivity(intent)
         }
     }
 

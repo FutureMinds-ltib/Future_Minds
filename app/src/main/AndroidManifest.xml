@@ -27,7 +27,19 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".ForgotPasswordActivity"
+            android:exported="false" />
+
+        <activity android:name=".RegisterActivity"
+            android:exported="false" />
+
         <activity android:name=".MainActivity"
+            android:exported="false" />
+
+        <activity android:name=".GuardianActivity"
+            android:exported="false" />
+
+        <activity android:name=".ProtectedActivity"
             android:exported="false" />
     </application>
 

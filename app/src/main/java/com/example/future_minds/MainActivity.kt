@@ -3,9 +3,9 @@ package com.example.future_minds
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlertDialog
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.location.Geocoder
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.util.Log
@@ -14,6 +14,11 @@ import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
+import com.google.android.material.navigation.NavigationView
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
@@ -29,11 +34,15 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
 
     private lateinit var map: MapView
-    private lateinit var locationSearch: LocationSearch
+    private lateinit var locationSearch: LocationSearch 
     private lateinit var routeManager: RouteManager
     private var badZonesList = mutableListOf<Map<String, Any>>()
     private var dangerZoneOverlays = mutableListOf<Polygon>()
     private lateinit var locationOverlay: MyLocationNewOverlay
+    
+    private lateinit var drawerLayout: DrawerLayout
+    private lateinit var auth: FirebaseAuth
+    private lateinit var db: FirebaseFirestore
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
@@ -49,6 +58,36 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this))
         setContentView(R.layout.activity_main)
+
+        auth = FirebaseAuth.getInstance()
+        db = FirebaseFirestore.getInstance()
+
+        drawerLayout = findViewById(R.id.drawer_layout)
+        val navView = findViewById<NavigationView>(R.id.nav_view)
+        val btnMenu = findViewById<ImageButton>(R.id.btn_menu)
+
+        btnMenu.setOnClickListener {
+            drawerLayout.openDrawer(GravityCompat.START)
+        }
+
+        setupNavigationHeader(navView)
+        migrateOldGuardianData() // Mutăm datele vechi dacă există
+        listenForGuardianRequests()
+
+        navView.setNavigationItemSelectedListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.nav_guardian -> {
+                    val intent = Intent(this, GuardianActivity::class.java)
+                    startActivity(intent)
+                }
+                R.id.nav_protected -> {
+                    val intent = Intent(this, ProtectedActivity::class.java)
+                    startActivity(intent)
+                }
+            }
+            drawerLayout.closeDrawer(GravityCompat.START)
+            true
+        }
 
         map = findViewById(R.id.map)
         map.setTileSource(TileSourceFactory.MAPNIK)
@@ -71,9 +110,6 @@ class MainActivity : AppCompatActivity() {
             if (isChecked) testare_bool=true else testare_bool=false
         })
 
-
-
-
         val mapController = map.controller
         mapController.setZoom(15.0)
         val startPoint = GeoPoint(44.420483, 26.061319)
@@ -84,7 +120,6 @@ class MainActivity : AppCompatActivity() {
         val searchButton = findViewById<ImageButton>(R.id.btn_search)
         locationSearch = LocationSearch(this, map, searchBar, searchButton)
 
-        // Setup Map Events (Long Press for reporting)
         val mapEventsReceiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
             override fun longPressHelper(p: GeoPoint?): Boolean {
@@ -104,11 +139,92 @@ class MainActivity : AppCompatActivity() {
         }
         map.overlays.add(MapEventsOverlay(mapEventsReceiver))
 
-
-
-
         listenForDangerZones()
         checkLocationPermission()
+    }
+
+    private fun migrateOldGuardianData() {
+        val currentUser = auth.currentUser ?: return
+        db.collection("users").document(currentUser.uid).get().addOnSuccessListener { doc ->
+            if (doc.contains("guardianUid")) {
+                val gUid = doc.getString("guardianUid")
+                val gName = doc.getString("guardianUsername")
+                val status = doc.getString("guardianStatus")
+                val myName = doc.getString("username") ?: "User"
+
+                if (gUid != null) {
+                    val connection = hashMapOf(
+                        "protectedUid" to currentUser.uid,
+                        "protectedUsername" to myName,
+                        "guardianUid" to gUid,
+                        "guardianUsername" to gName,
+                        "status" to status
+                    )
+                    db.collection("connections").add(connection).addOnSuccessListener {
+                        // Ștergem datele vechi din documentul utilizatorului ca să nu migrăm de două ori
+                        db.collection("users").document(currentUser.uid).update(
+                            "guardianUid", FieldValue.delete(),
+                            "guardianUsername", FieldValue.delete(),
+                            "guardianStatus", FieldValue.delete()
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun listenForGuardianRequests() {
+        val currentUser = auth.currentUser ?: return
+        db.collection("connections")
+            .whereEqualTo("guardianUid", currentUser.uid)
+            .whereEqualTo("status", "pending")
+            .addSnapshotListener { snapshots, e ->
+                if (e != null) return@addSnapshotListener
+                for (doc in snapshots!!) {
+                    val requesterUsername = doc.getString("protectedUsername") ?: "Cineva"
+                    val connectionId = doc.id
+                    showGuardianRequestDialog(requesterUsername, connectionId)
+                }
+            }
+    }
+
+    private fun showGuardianRequestDialog(username: String, connectionId: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Cerere Gardian")
+            .setMessage("$username dorește să îi fii gardian. Ești de acord?")
+            .setPositiveButton("Accept") { _, _ -> updateConnectionStatus(connectionId, "accepted") }
+            .setNegativeButton("Refuz") { _, _ -> updateConnectionStatus(connectionId, "rejected") }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun updateConnectionStatus(connectionId: String, newStatus: String) {
+        db.collection("connections").document(connectionId)
+            .update("status", newStatus)
+            .addOnSuccessListener {
+                Toast.makeText(this, "Status actualizat: $newStatus", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun setupNavigationHeader(navView: NavigationView) {
+        val headerView = navView.getHeaderView(0)
+        val tvUsername = headerView.findViewById<TextView>(R.id.tv_username)
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            if (currentUser.isAnonymous) {
+                tvUsername.text = "Guest User"
+            } else {
+                db.collection("users").document(currentUser.uid).get()
+                    .addOnSuccessListener { document ->
+                        if (document != null && document.exists()) {
+                            val username = document.getString("username")
+                            tvUsername.text = username ?: "No Username"
+                        } else {
+                            tvUsername.text = currentUser.email
+                        }
+                    }
+            }
+        }
     }
 
     private fun checkLocationPermission() {
@@ -127,32 +243,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun listenForDangerZones() {
-
-        val db = FirebaseFirestore.getInstance()
         db.collection("reports").addSnapshotListener { snapshots, e ->
             if (e != null) {
                 Log.w("Firestore", "Listen failed.", e)
                 return@addSnapshotListener
             }
-
             if (snapshots != null) {
-                // Remove existing overlays
                 dangerZoneOverlays.forEach { map.overlays.remove(it) }
                 dangerZoneOverlays.clear()
                 badZonesList.clear()
-
                 for (document in snapshots) {
                     val lat = document.getDouble("lat") ?: 0.0
                     val lng = document.getDouble("lng") ?: 0.0
                     val radius = document.getDouble("radius") ?: 20.0
                     val type = document.getString("type") ?: "Unsafe Area"
-
-                    val zoneData = mapOf(
-                        "lat" to lat,
-                        "lng" to lng,
-                        "radius" to radius,
-                        "type" to type
-                    )
+                    val zoneData = mapOf("lat" to lat, "lng" to lng, "radius" to radius, "type" to type)
                     badZonesList.add(zoneData)
                     addDangerZoneToMap(GeoPoint(lat, lng), radius, type)
                 }
@@ -166,7 +271,6 @@ class MainActivity : AppCompatActivity() {
         val spinner = dialogView.findViewById<Spinner>(R.id.spinner_issue_type)
         val seekBar = dialogView.findViewById<SeekBar>(R.id.seekbar_radius)
         val tvRadius = dialogView.findViewById<TextView>(R.id.tv_radius_label)
-
         var currentRadius = 20.0
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -177,25 +281,16 @@ class MainActivity : AppCompatActivity() {
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
-
-        AlertDialog.Builder(this)
-            .setView(dialogView)
-            .setPositiveButton("Report") { dialog, _ ->
-                val issueType = spinner.selectedItem.toString()
-                saveReportToDatabase(point, currentRadius, issueType)
-                dialog.dismiss()
-            }
-            .setNegativeButton("Cancel") { dialog, _ ->
-                dialog.dismiss()
-            }
-            .create()
-            .show()
+        AlertDialog.Builder(this).setView(dialogView).setPositiveButton("Report") { dialog, _ ->
+            val issueType = spinner.selectedItem.toString()
+            saveReportToDatabase(point, currentRadius, issueType)
+            dialog.dismiss()
+        }.setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }.create().show()
     }
 
     private fun addDangerZoneToMap(center: GeoPoint, radius: Double, type: String) {
         val circle = Polygon()
         circle.points = Polygon.pointsAsCircle(center, radius)
-
         val color = when (type) {
             "Unsafe Area" -> Color.argb(100, 255, 0, 0)
             "Construction" -> Color.argb(100, 255, 165, 0)
@@ -206,28 +301,17 @@ class MainActivity : AppCompatActivity() {
         circle.strokeColor = color
         circle.strokeWidth = 2.0f
         circle.title = "$type (${radius.toInt()}m)"
-
         map.overlays.add(circle)
         dangerZoneOverlays.add(circle)
     }
 
     private fun saveReportToDatabase(point: GeoPoint, radius: Double, type: String) {
-        val db = FirebaseFirestore.getInstance()
-        val report = hashMapOf(
-            "lat" to point.latitude,
-            "lng" to point.longitude,
-            "radius" to radius,
-            "type" to type,
-            "timestamp" to Date()
-        )
-        db.collection("reports")
-            .add(report)
-            .addOnSuccessListener {
-                Toast.makeText(this, "Report Saved to Cloud!", Toast.LENGTH_SHORT).show()
-            }
-            .addOnFailureListener { e ->
-                Toast.makeText(this, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+        val report = hashMapOf("lat" to point.latitude, "lng" to point.longitude, "radius" to radius, "type" to type, "timestamp" to Date())
+        db.collection("reports").add(report).addOnSuccessListener {
+            Toast.makeText(this, "Report Saved to Cloud!", Toast.LENGTH_SHORT).show()
+        }.addOnFailureListener { e ->
+            Toast.makeText(this, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun calculateSafeRoute(destination: GeoPoint) {
@@ -240,15 +324,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        map.onResume()
-        if (::locationOverlay.isInitialized) locationOverlay.enableMyLocation()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        map.onPause()
-        if (::locationOverlay.isInitialized) locationOverlay.disableMyLocation()
-    }
+    override fun onResume() { super.onResume() ; map.onResume() ; if (::locationOverlay.isInitialized) locationOverlay.enableMyLocation() }
+    override fun onPause() { super.onPause() ; map.onPause() ; if (::locationOverlay.isInitialized) locationOverlay.disableMyLocation() }
 }

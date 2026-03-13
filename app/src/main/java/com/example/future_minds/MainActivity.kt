@@ -6,16 +6,19 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.preference.PreferenceManager
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.bumptech.glide.Glide
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -71,11 +74,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         setupNavigationHeader(navView)
-        migrateOldGuardianData() // Mutăm datele vechi dacă există
+        migrateOldGuardianData() 
         listenForGuardianRequests()
 
         navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
+                R.id.nav_profile -> {
+                    val intent = Intent(this, ProfileActivity::class.java)
+                    startActivity(intent)
+                }
                 R.id.nav_guardian -> {
                     val intent = Intent(this, GuardianActivity::class.java)
                     startActivity(intent)
@@ -84,9 +91,16 @@ class MainActivity : AppCompatActivity() {
                     val intent = Intent(this, ProtectedActivity::class.java)
                     startActivity(intent)
                 }
+                R.id.nav_logout -> {
+                    showSignOutConfirmation()
+                }
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
+        }
+
+        findViewById<View>(R.id.btn_profile_container)?.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
         }
 
         map = findViewById(R.id.map)
@@ -141,6 +155,55 @@ class MainActivity : AppCompatActivity() {
 
         listenForDangerZones()
         checkLocationPermission()
+        listenForUserData()
+    }
+
+    private fun showSignOutConfirmation() {
+        AlertDialog.Builder(this)
+            .setMessage("Ești sigur că dorești să ieși din cont?")
+            .setPositiveButton("Da") { _, _ ->
+                signOut()
+            }
+            .setNegativeButton("Nu", null)
+            .show()
+    }
+
+    private fun signOut() {
+        auth.signOut()
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    private fun listenForUserData() {
+        val uid = auth.currentUser?.uid ?: return
+        val ivMainProfile = findViewById<ImageView>(R.id.iv_main_profile)
+        val mainRankFrame = findViewById<View>(R.id.main_rank_frame)
+
+        db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
+            if (snapshot != null && snapshot.exists()) {
+                val profileUrl = snapshot.getString("profileImageUrl")
+                val trustFactor = snapshot.getLong("trustFactor")?.toInt() ?: 0
+                val rank = UserRank.fromTrustFactor(trustFactor)
+
+                if (mainRankFrame != null) applyRankFrame(mainRankFrame, rank)
+                if (!isFinishing && ivMainProfile != null) {
+                    Glide.with(this)
+                        .load(profileUrl ?: android.R.drawable.ic_menu_gallery)
+                        .circleCrop()
+                        .into(ivMainProfile)
+                }
+            }
+        }
+    }
+
+    private fun applyRankFrame(view: View, rank: UserRank) {
+        val gd = GradientDrawable()
+        gd.setColor(Color.TRANSPARENT)
+        gd.setStroke(6, rank.color)
+        gd.shape = GradientDrawable.OVAL
+        view.background = gd
     }
 
     private fun migrateOldGuardianData() {
@@ -161,7 +224,6 @@ class MainActivity : AppCompatActivity() {
                         "status" to status
                     )
                     db.collection("connections").add(connection).addOnSuccessListener {
-                        // Ștergem datele vechi din documentul utilizatorului ca să nu migrăm de două ori
                         db.collection("users").document(currentUser.uid).update(
                             "guardianUid", FieldValue.delete(),
                             "guardianUsername", FieldValue.delete(),
@@ -209,20 +271,44 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigationHeader(navView: NavigationView) {
         val headerView = navView.getHeaderView(0)
         val tvUsername = headerView.findViewById<TextView>(R.id.tv_username)
+        val tvNavRank = headerView.findViewById<TextView>(R.id.tv_nav_rank)
+        val ivUserPhoto = headerView.findViewById<ImageView>(R.id.iv_user_photo)
+        val navRankFrame = headerView.findViewById<View>(R.id.nav_rank_frame)
+        
+        // Also make the header clickable to go to profile
+        headerView.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
+            drawerLayout.closeDrawer(GravityCompat.START)
+        }
+        
         val currentUser = auth.currentUser
         if (currentUser != null) {
             if (currentUser.isAnonymous) {
                 tvUsername.text = "Guest User"
+                tvNavRank.text = ""
             } else {
-                db.collection("users").document(currentUser.uid).get()
-                    .addOnSuccessListener { document ->
-                        if (document != null && document.exists()) {
-                            val username = document.getString("username")
-                            tvUsername.text = username ?: "No Username"
-                        } else {
-                            tvUsername.text = currentUser.email
+                db.collection("users").document(currentUser.uid).addSnapshotListener { document, _ ->
+                    if (document != null && document.exists()) {
+                        val username = document.getString("username")
+                        val trustFactor = document.getLong("trustFactor")?.toInt() ?: 0
+                        val profileUrl = document.getString("profileImageUrl")
+                        val rank = UserRank.fromTrustFactor(trustFactor)
+
+                        tvUsername.text = username ?: "No Username"
+                        tvNavRank.text = rank.displayName
+                        tvNavRank.setTextColor(rank.color)
+                        applyRankFrame(navRankFrame, rank)
+
+                        if (!isFinishing) {
+                            Glide.with(this)
+                                .load(profileUrl ?: android.R.drawable.ic_menu_gallery)
+                                .circleCrop()
+                                .into(ivUserPhoto)
                         }
+                    } else {
+                        tvUsername.text = currentUser.email
                     }
+                }
             }
         }
     }
@@ -306,9 +392,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveReportToDatabase(point: GeoPoint, radius: Double, type: String) {
-        val report = hashMapOf("lat" to point.latitude, "lng" to point.longitude, "radius" to radius, "type" to type, "timestamp" to Date())
+        val currentUser = auth.currentUser
+        val report = hashMapOf(
+            "lat" to point.latitude, 
+            "lng" to point.longitude, 
+            "radius" to radius, 
+            "type" to type, 
+            "timestamp" to Date(),
+            "userId" to (currentUser?.uid ?: "anonymous")
+        )
         db.collection("reports").add(report).addOnSuccessListener {
-            Toast.makeText(this, "Report Saved to Cloud!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Report Saved!", Toast.LENGTH_SHORT).show()
+            // Recompensă Trust Factor pentru raportare
+            if (currentUser != null && !currentUser.isAnonymous) {
+                db.collection("users").document(currentUser.uid)
+                    .update("trustFactor", FieldValue.increment(10))
+            }
         }.addOnFailureListener { e ->
             Toast.makeText(this, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
         }

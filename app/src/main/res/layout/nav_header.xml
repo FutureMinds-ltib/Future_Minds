@@ -8,23 +8,46 @@
     android:padding="16dp"
     android:theme="@style/ThemeOverlay.AppCompat.Dark">
 
-    <ImageView
-        android:id="@+id/iv_user_photo"
+    <FrameLayout
         android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:src="@android:drawable/ic_menu_gallery"
-        android:background="@android:drawable/progress_horizontal"
-        android:padding="2dp" />
+        android:layout_height="64dp">
 
-    <TextView
-        android:id="@+id/tv_username"
+        <ImageView
+            android:id="@+id/iv_user_photo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@android:drawable/ic_menu_gallery"
+            android:padding="4dp" />
+
+        <View
+            android:id="@+id/nav_rank_frame"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent" />
+    </FrameLayout>
+
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_gravity="center_vertical"
-        android:text="Username"
-        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
-        android:textSize="18sp"
-        android:textStyle="bold" />
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_username"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Username"
+            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_nav_rank"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Școlărel"
+            android:textSize="14sp" />
+    </LinearLayout>
 
 </LinearLayout>

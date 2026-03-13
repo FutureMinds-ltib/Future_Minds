@@ -42,7 +42,9 @@ class RegisterActivity : AppCompatActivity() {
                             val userData = hashMapOf(
                                 "username" to username,
                                 "email" to email,
-                                "phone" to phone
+                                "phone" to phone,
+                                "trustFactor" to 0,
+                                "profileImageUrl" to null
                             )
                             
                             user?.uid?.let { uid ->

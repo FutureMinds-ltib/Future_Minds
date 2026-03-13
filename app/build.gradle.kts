@@ -6,9 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.future_minds"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.future_minds"
@@ -59,9 +57,13 @@ dependencies {
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")     // For Login
     implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // We also need a JSON parser to read the result
     implementation("org.json:json:20231013")
+
+    // Image loading
+    implementation("com.github.bumptech.glide:glide:4.16.0")
 }

@@ -2,6 +2,10 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <group android:checkableBehavior="single">
         <item
+            android:id="@+id/nav_profile"
+            android:icon="@android:drawable/ic_menu_edit"
+            android:title="Profile &amp; Ranking" />
+        <item
             android:id="@+id/nav_guardian"
             android:icon="@android:drawable/ic_menu_myplaces"
             android:title="Gardianul tău" />
@@ -10,4 +14,13 @@
             android:icon="@android:drawable/ic_menu_view"
             android:title="Sclavii mei" />
     </group>
+
+    <item android:title="Account Settings">
+        <menu>
+            <item
+                android:id="@+id/nav_logout"
+                android:icon="@android:drawable/ic_lock_power_off"
+                android:title="Sign Out" />
+        </menu>
+    </item>
 </menu>

@@ -2,12 +2,14 @@ package com.example.future_minds
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
-import android.widget.ImageButton
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -26,20 +28,20 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
     private lateinit var storage: FirebaseStorage
-
+    
     private lateinit var ivProfileLarge: ImageView
-    private lateinit var rankFrame: View
     private lateinit var tvUsername: TextView
     private lateinit var tvRank: TextView
     private lateinit var tvTrustFactor: TextView
+    private lateinit var rankFrame: View
     private lateinit var rvCommunity: RecyclerView
-
-    private var selectedImageUri: Uri? = null
 
     private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            selectedImageUri = result.data?.data
-            selectedImageUri?.let { uploadProfilePicture(it) }
+            val imageUri = result.data?.data
+            if (imageUri != null) {
+                uploadProfileImage(imageUri)
+            }
         }
     }
 
@@ -52,110 +54,136 @@ class ProfileActivity : AppCompatActivity() {
         storage = FirebaseStorage.getInstance()
 
         ivProfileLarge = findViewById(R.id.iv_profile_large)
-        rankFrame = findViewById(R.id.rank_frame)
         tvUsername = findViewById(R.id.tv_profile_username)
         tvRank = findViewById(R.id.tv_profile_rank)
         tvTrustFactor = findViewById(R.id.tv_trust_factor)
+        rankFrame = findViewById(R.id.rank_frame)
         rvCommunity = findViewById(R.id.rv_community_ranks)
 
-        findViewById<ImageButton>(R.id.btn_profile_back).setOnClickListener {
-            finish()
-        }
+        findViewById<View>(R.id.btn_profile_back).setOnClickListener { finish() }
 
-        findViewById<Button>(R.id.btn_change_photo).setOnClickListener {
-            val intent = Intent(Intent.ACTION_PICK)
-            intent.type = "image/*"
+        findViewById<View>(R.id.btn_change_photo).setOnClickListener {
+            val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
             pickImageLauncher.launch(intent)
         }
 
-        findViewById<Button>(R.id.btn_remove_photo).setOnClickListener {
-            removeProfilePicture()
+        findViewById<View>(R.id.btn_remove_photo).setOnClickListener {
+            removeProfilePhoto()
         }
 
         loadUserData()
-        loadCommunityRanking()
+        setupCommunityRanking()
     }
 
     private fun loadUserData() {
         val uid = auth.currentUser?.uid ?: return
         db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
+            if (isFinishing || isDestroyed) return@addSnapshotListener
             if (snapshot != null && snapshot.exists()) {
                 val username = snapshot.getString("username") ?: "User"
-                val trustFactor = snapshot.getLong("trustFactor")?.toInt() ?: 0
                 val profileUrl = snapshot.getString("profileImageUrl")
+                val trustFactor = snapshot.getLong("trustFactor")?.toInt() ?: 0
+                val rank = UserRank.fromTrustFactor(trustFactor)
 
                 tvUsername.text = username
-                tvTrustFactor.text = "Trust Factor: $trustFactor"
-                
-                val rank = UserRank.fromTrustFactor(trustFactor)
                 tvRank.text = "Rank: ${rank.displayName}"
                 tvRank.setTextColor(rank.color)
-                
+                tvTrustFactor.text = "Trust Factor: $trustFactor"
                 applyRankFrame(rankFrame, rank)
 
-                if (!isFinishing) {
-                    Glide.with(this)
-                        .load(profileUrl ?: android.R.drawable.ic_menu_gallery)
-                        .circleCrop()
-                        .into(ivProfileLarge)
-                }
+                Glide.with(this)
+                    .load(profileUrl ?: android.R.drawable.ic_menu_gallery)
+                    .circleCrop()
+                    .into(ivProfileLarge)
             }
         }
     }
 
     private fun applyRankFrame(view: View, rank: UserRank) {
-        val strokeWidth = 8
         val gd = GradientDrawable()
-        gd.setColor(android.graphics.Color.TRANSPARENT)
-        gd.setStroke(strokeWidth, rank.color)
+        gd.setColor(Color.TRANSPARENT)
+        gd.setStroke(8, rank.color)
         gd.shape = GradientDrawable.OVAL
-        
-        if (rank == UserRank.SCOLAR_PATRON) {
-            gd.setStroke(12, rank.color, 10f, 5f)
-        }
-        
         view.background = gd
     }
 
-    private fun uploadProfilePicture(uri: Uri) {
+    private fun uploadProfileImage(uri: Uri) {
         val uid = auth.currentUser?.uid ?: return
-        val ref = storage.reference.child("profile_pictures/$uid.jpg")
-
+        val ref = storage.reference.child("profile_images/$uid.jpg")
+        
+        Toast.makeText(this, "Se încarcă imaginea...", Toast.LENGTH_SHORT).show()
+        
         ref.putFile(uri).addOnSuccessListener {
             ref.downloadUrl.addOnSuccessListener { downloadUri ->
-                db.collection("users").document(uid)
-                    .update("profileImageUrl", downloadUri.toString())
+                db.collection("users").document(uid).update("profileImageUrl", downloadUri.toString())
                     .addOnSuccessListener {
-                        Toast.makeText(this, "Profile picture updated!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Imagine actualizată!", Toast.LENGTH_SHORT).show()
                     }
             }
         }.addOnFailureListener {
-            Toast.makeText(this, "Upload failed: ${it.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Eroare la încărcare: ${it.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun removeProfilePicture() {
+    private fun removeProfilePhoto() {
         val uid = auth.currentUser?.uid ?: return
-        db.collection("users").document(uid)
-            .update("profileImageUrl", null)
+        db.collection("users").document(uid).update("profileImageUrl", null)
             .addOnSuccessListener {
-                Toast.makeText(this, "Profile picture removed!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Imagine eliminată!", Toast.LENGTH_SHORT).show()
             }
     }
 
-    private fun loadCommunityRanking() {
+    private fun setupCommunityRanking() {
+        rvCommunity.layoutManager = LinearLayoutManager(this)
         db.collection("users")
             .orderBy("trustFactor", Query.Direction.DESCENDING)
             .limit(10)
             .get()
-            .addOnSuccessListener { documents ->
-                val userList = mutableListOf<UserProfile>()
-                for (doc in documents) {
-                    val user = doc.toObject(UserProfile::class.java).copy(uid = doc.id)
-                    userList.add(user)
-                }
-                rvCommunity.layoutManager = LinearLayoutManager(this)
-                rvCommunity.adapter = UserAdapter(userList)
+            .addOnSuccessListener { snapshots ->
+                if (isFinishing || isDestroyed) return@addOnSuccessListener
+                val users = snapshots.documents.map { it.data ?: emptyMap<String, Any>() }
+                rvCommunity.adapter = CommunityAdapter(users)
             }
+    }
+
+    private inner class CommunityAdapter(private val users: List<Map<String, Any>>) : 
+        RecyclerView.Adapter<CommunityAdapter.ViewHolder>() {
+
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val tvName: TextView = view.findViewById(R.id.tv_item_rank_name)
+            val tvFactor: TextView = view.findViewById(R.id.tv_item_rank_factor)
+            val ivPhoto: ImageView = view.findViewById(R.id.iv_item_rank_photo)
+            val frame: View = view.findViewById(R.id.item_rank_frame)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_user_rank, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val user = users[position]
+            val name = user["username"] as? String ?: "User"
+            val factor = (user["trustFactor"] as? Long)?.toInt() ?: 0
+            val photoUrl = user["profileImageUrl"] as? String
+            val rank = UserRank.fromTrustFactor(factor)
+
+            holder.tvName.text = "${position + 1}. $name"
+            holder.tvFactor.text = "TF: $factor"
+            holder.tvName.setTextColor(rank.color)
+            
+            val gd = GradientDrawable()
+            gd.setColor(Color.TRANSPARENT)
+            gd.setStroke(4, rank.color)
+            gd.shape = GradientDrawable.OVAL
+            holder.frame.background = gd
+
+            Glide.with(holder.itemView.context)
+                .load(photoUrl ?: android.R.drawable.ic_menu_gallery)
+                .circleCrop()
+                .into(holder.ivPhoto)
+        }
+
+        override fun getItemCount() = users.size
     }
 }

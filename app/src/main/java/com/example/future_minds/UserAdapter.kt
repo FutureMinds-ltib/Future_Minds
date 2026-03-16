@@ -1,5 +1,7 @@
 package com.example.future_minds
 
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,10 +20,11 @@ data class UserProfile(
 class UserAdapter(private val users: List<UserProfile>) : RecyclerView.Adapter<UserAdapter.UserViewHolder>() {
 
     class UserViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val ivProfile: ImageView = view.findViewById(R.id.iv_item_profile)
-        val tvUsername: TextView = view.findViewById(R.id.tv_item_username)
-        val tvRank: TextView = view.findViewById(R.id.tv_item_rank)
-        val tvTrust: TextView = view.findViewById(R.id.tv_item_trust)
+        val ivProfile: ImageView = view.findViewById(R.id.iv_item_rank_photo)
+        val tvUsername: TextView = view.findViewById(R.id.tv_item_rank_name)
+        val tvRank: TextView = view.findViewById(R.id.tv_item_rank_label)
+        val tvTrust: TextView = view.findViewById(R.id.tv_item_rank_factor)
+        val frame: View = view.findViewById(R.id.item_rank_frame)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): UserViewHolder {
@@ -36,6 +39,13 @@ class UserAdapter(private val users: List<UserProfile>) : RecyclerView.Adapter<U
         holder.tvRank.text = rank.displayName
         holder.tvRank.setTextColor(rank.color)
         holder.tvTrust.text = "TF: ${user.trustFactor}"
+
+        // Apply rank frame
+        val gd = GradientDrawable()
+        gd.setColor(Color.TRANSPARENT)
+        gd.setStroke(4, rank.color)
+        gd.shape = GradientDrawable.OVAL
+        holder.frame.background = gd
 
         if (user.profileImageUrl != null) {
             Glide.with(holder.itemView.context).load(user.profileImageUrl).circleCrop().into(holder.ivProfile)

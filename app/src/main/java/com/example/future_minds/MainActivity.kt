@@ -181,14 +181,14 @@ class MainActivity : AppCompatActivity() {
         val ivMainProfile = findViewById<ImageView>(R.id.iv_main_profile)
         val mainRankFrame = findViewById<View>(R.id.main_rank_frame)
 
-        db.collection("users").document(uid).addSnapshotListener(this) { snapshot, _ ->
+        db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
             if (snapshot != null && snapshot.exists()) {
                 val profileUrl = snapshot.getString("profileImageUrl")
                 val trustFactor = snapshot.getLong("trustFactor")?.toInt() ?: 0
                 val rank = UserRank.fromTrustFactor(trustFactor)
 
                 if (mainRankFrame != null) applyRankFrame(mainRankFrame, rank)
-                if (!isFinishing && !isDestroyed && ivMainProfile != null) {
+                if (!isFinishing && ivMainProfile != null) {
                     Glide.with(this)
                         .load(profileUrl ?: android.R.drawable.ic_menu_gallery)
                         .circleCrop()
@@ -240,10 +240,8 @@ class MainActivity : AppCompatActivity() {
         db.collection("connections")
             .whereEqualTo("guardianUid", currentUser.uid)
             .whereEqualTo("status", "pending")
-            .addSnapshotListener(this) { snapshots, e ->
+            .addSnapshotListener { snapshots, e ->
                 if (e != null) return@addSnapshotListener
-                if (isFinishing || isDestroyed) return@addSnapshotListener
-                
                 for (doc in snapshots!!) {
                     val requesterUsername = doc.getString("protectedUsername") ?: "Cineva"
                     val connectionId = doc.id
@@ -253,8 +251,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showGuardianRequestDialog(username: String, connectionId: String) {
-        if (isFinishing || isDestroyed) return
-        
         AlertDialog.Builder(this)
             .setTitle("Cerere Gardian")
             .setMessage("$username dorește să îi fii gardian. Ești de acord?")
@@ -291,7 +287,7 @@ class MainActivity : AppCompatActivity() {
                 tvUsername.text = "Guest User"
                 tvNavRank.text = ""
             } else {
-                db.collection("users").document(currentUser.uid).addSnapshotListener(this) { document, _ ->
+                db.collection("users").document(currentUser.uid).addSnapshotListener { document, _ ->
                     if (document != null && document.exists()) {
                         val username = document.getString("username")
                         val trustFactor = document.getLong("trustFactor")?.toInt() ?: 0
@@ -303,7 +299,7 @@ class MainActivity : AppCompatActivity() {
                         tvNavRank.setTextColor(rank.color)
                         applyRankFrame(navRankFrame, rank)
 
-                        if (!isFinishing && !isDestroyed) {
+                        if (!isFinishing) {
                             Glide.with(this)
                                 .load(profileUrl ?: android.R.drawable.ic_menu_gallery)
                                 .circleCrop()
@@ -333,7 +329,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun listenForDangerZones() {
-        db.collection("reports").addSnapshotListener(this) { snapshots, e ->
+        db.collection("reports").addSnapshotListener { snapshots, e ->
             if (e != null) {
                 Log.w("Firestore", "Listen failed.", e)
                 return@addSnapshotListener

@@ -12,7 +12,7 @@
         <item
             android:id="@+id/nav_protected"
             android:icon="@android:drawable/ic_menu_view"
-            android:title="Sclavii mei" />
+            android:title="Protejații mei" />
     </group>
 
     <item android:title="Account Settings">

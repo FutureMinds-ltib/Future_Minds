@@ -35,8 +35,9 @@ class ProtectedActivity : AppCompatActivity() {
         db.collection("connections")
             .whereEqualTo("guardianUid", currentUser.uid)
             .whereEqualTo("status", "accepted")
-            .addSnapshotListener { snapshots, e ->
+            .addSnapshotListener(this) { snapshots, e ->
                 if (e != null) return@addSnapshotListener
+                if (isFinishing || isDestroyed) return@addSnapshotListener
                 
                 llProtectedList.removeAllViews()
                 
@@ -56,7 +57,11 @@ class ProtectedActivity : AppCompatActivity() {
         
         view.findViewById<ImageButton>(R.id.btn_remove_connection).setOnClickListener {
             db.collection("connections").document(connectionId).delete()
-                .addOnSuccessListener { Toast.makeText(this, "Nu mai ești gardianul lui $name", Toast.LENGTH_SHORT).show() }
+                .addOnSuccessListener { 
+                    if (!isFinishing && !isDestroyed) {
+                        Toast.makeText(this, "Nu mai ești gardianul lui $name", Toast.LENGTH_SHORT).show()
+                    }
+                }
         }
         
         llProtectedList.addView(view)

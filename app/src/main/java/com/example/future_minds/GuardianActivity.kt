@@ -47,8 +47,9 @@ class GuardianActivity : AppCompatActivity() {
         
         db.collection("connections")
             .whereEqualTo("protectedUid", currentUser.uid)
-            .addSnapshotListener { snapshots, e ->
+            .addSnapshotListener(this) { snapshots, e ->
                 if (e != null) return@addSnapshotListener
+                if (isFinishing || isDestroyed) return@addSnapshotListener
                 
                 llGuardiansList.removeAllViews()
                 
@@ -69,7 +70,11 @@ class GuardianActivity : AppCompatActivity() {
         
         view.findViewById<ImageButton>(R.id.btn_remove_connection).setOnClickListener {
             db.collection("connections").document(connectionId).delete()
-                .addOnSuccessListener { Toast.makeText(this, "Gardian eliminat", Toast.LENGTH_SHORT).show() }
+                .addOnSuccessListener { 
+                    if (!isFinishing && !isDestroyed) {
+                        Toast.makeText(this, "Gardian eliminat", Toast.LENGTH_SHORT).show()
+                    }
+                }
         }
         
         llGuardiansList.addView(view)
@@ -80,6 +85,8 @@ class GuardianActivity : AppCompatActivity() {
             .whereEqualTo("username", username)
             .get()
             .addOnSuccessListener { documents ->
+                if (isFinishing || isDestroyed) return@addOnSuccessListener
+                
                 if (!documents.isEmpty) {
                     val guardianDoc = documents.documents[0]
                     val guardianUid = guardianDoc.id
@@ -104,6 +111,8 @@ class GuardianActivity : AppCompatActivity() {
             .whereEqualTo("guardianUid", guardianUid)
             .get()
             .addOnSuccessListener { docs ->
+                if (isFinishing || isDestroyed) return@addOnSuccessListener
+                
                 if (docs.isEmpty) {
                     val connection = hashMapOf(
                         "protectedUid" to currentUser.uid,
@@ -114,10 +123,13 @@ class GuardianActivity : AppCompatActivity() {
                     )
                     
                     db.collection("users").document(currentUser.uid).get().addOnSuccessListener { myDoc ->
+                        if (isFinishing || isDestroyed) return@addOnSuccessListener
                         connection["protectedUsername"] = myDoc.getString("username") ?: "User"
                         db.collection("connections").add(connection)
                             .addOnSuccessListener {
-                                Toast.makeText(this, "Cerere trimisă!", Toast.LENGTH_SHORT).show()
+                                if (!isFinishing && !isDestroyed) {
+                                    Toast.makeText(this, "Cerere trimisă!", Toast.LENGTH_SHORT).show()
+                                }
                             }
                     }
                 } else {

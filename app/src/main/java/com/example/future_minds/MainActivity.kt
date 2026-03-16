@@ -18,11 +18,14 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -275,7 +278,6 @@ class MainActivity : AppCompatActivity() {
         val ivUserPhoto = headerView.findViewById<ImageView>(R.id.iv_user_photo)
         val navRankFrame = headerView.findViewById<View>(R.id.nav_rank_frame)
         
-        // Also make the header clickable to go to profile
         headerView.setOnClickListener {
             startActivity(Intent(this, ProfileActivity::class.java))
             drawerLayout.closeDrawer(GravityCompat.START)
@@ -345,7 +347,7 @@ class MainActivity : AppCompatActivity() {
                     val type = document.getString("type") ?: "Unsafe Area"
                     val zoneData = mapOf("lat" to lat, "lng" to lng, "radius" to radius, "type" to type)
                     badZonesList.add(zoneData)
-                    addDangerZoneToMap(GeoPoint(lat, lng), radius, type)
+                    addDangerZoneToMap(GeoPoint(lat, lng), radius, type, document.id)
                 }
                 map.invalidate()
             }
@@ -369,12 +371,14 @@ class MainActivity : AppCompatActivity() {
         })
         AlertDialog.Builder(this).setView(dialogView).setPositiveButton("Report") { dialog, _ ->
             val issueType = spinner.selectedItem.toString()
-            saveReportToDatabase(point, currentRadius, issueType)
+            lifecycleScope.launch {
+                saveReportToDatabase(point, currentRadius, issueType)
+            }
             dialog.dismiss()
         }.setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }.create().show()
     }
 
-    private fun addDangerZoneToMap(center: GeoPoint, radius: Double, type: String) {
+    private fun addDangerZoneToMap(center: GeoPoint, radius: Double, type: String, reportId: String) {
         val circle = Polygon()
         circle.points = Polygon.pointsAsCircle(center, radius)
         val color = when (type) {
@@ -387,24 +391,113 @@ class MainActivity : AppCompatActivity() {
         circle.strokeColor = color
         circle.strokeWidth = 2.0f
         circle.title = "$type (${radius.toInt()}m)"
+        
+        circle.setOnClickListener { _, _, _ ->
+            showConfirmDeleteDialog(reportId)
+            true
+        }
+
         map.overlays.add(circle)
         dangerZoneOverlays.add(circle)
     }
 
-    private fun saveReportToDatabase(point: GeoPoint, radius: Double, type: String) {
+    private fun showConfirmDeleteDialog(reportId: String) {
         val currentUser = auth.currentUser
+        if (currentUser == null || currentUser.isAnonymous) {
+            Toast.makeText(this, "You must be logged in to vote on reports.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        db.collection("users").document(currentUser.uid).get().addOnSuccessListener { userDoc ->
+            val userTrust = userDoc.getLong("trustFactor") ?: 0L
+            val voteWeight = if (userTrust < 2) 1L else userTrust / 2
+
+            AlertDialog.Builder(this)
+                .setTitle("Confirm Report")
+                .setMessage("Do you agree with this report?")
+                .setPositiveButton("Keep") { _, _ ->
+                    updateReportTrust(reportId, voteWeight)
+                }
+                .setNegativeButton("Remove") { _, _ ->
+                    updateReportTrust(reportId, -voteWeight)
+                }
+                .show()
+        }.addOnFailureListener {
+            Toast.makeText(this, "Error fetching user data", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateReportTrust(reportId: String, weight: Long) {
+        val currentUser = auth.currentUser ?: return
+        val reportRef = db.collection("reports").document(reportId)
+
+        reportRef.get().addOnSuccessListener { snapshot ->
+            val voters = snapshot.get("voters") as? List<String> ?: listOf()
+            if (voters.contains(currentUser.uid)) {
+                Toast.makeText(this, "You have already voted on this report!", Toast.LENGTH_SHORT).show()
+                return@addOnSuccessListener
+            }
+
+            val creatorId = snapshot.getString("creatorId") ?: ""
+
+            val updates = hashMapOf(
+                "trust" to FieldValue.increment(weight),
+                "voters" to FieldValue.arrayUnion(currentUser.uid)
+            )
+
+            reportRef.update(updates as Map<String, Any>)
+                .addOnSuccessListener {
+                    if (creatorId.isNotEmpty() && creatorId != currentUser.uid) {
+                        db.collection("users").document(creatorId)
+                            .update("trustFactor", FieldValue.increment(weight))
+                    }
+
+                    reportRef.get().addOnSuccessListener { updatedSnapshot ->
+                        val currentTrust = updatedSnapshot.getLong("trust") ?: 0L
+                        if (currentTrust <= 0) {
+                            reportRef.delete()
+                            Toast.makeText(this, "Report removed.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this, "Vote registered!", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+        }
+    }
+
+    private suspend fun getTrust_suspend(): String {
+        val currentUser = auth.currentUser ?: return "0"
+        if (currentUser.isAnonymous) return "0"
+
+        return try {
+            val document = db.collection("users").document(currentUser.uid).get().await()
+            val trustVal = document.getLong("trustFactor")?.toString()
+                ?: document.getString("trustFactor")
+                ?: "0"
+            trustVal
+        } catch (e: Exception) {
+            "0"
+        }
+    }
+
+    private suspend fun saveReportToDatabase(point: GeoPoint, radius: Double, type: String) {
+        val trustStr = getTrust_suspend()
+        val currentUser = auth.currentUser ?: return
+        val trustValue = trustStr.toLongOrNull() ?: 0L
+
         val report = hashMapOf(
-            "lat" to point.latitude, 
-            "lng" to point.longitude, 
-            "radius" to radius, 
-            "type" to type, 
+            "lat" to point.latitude,
+            "lng" to point.longitude,
+            "radius" to radius,
+            "type" to type,
             "timestamp" to Date(),
-            "userId" to (currentUser?.uid ?: "anonymous")
+            "trust" to trustValue,
+            "creatorId" to currentUser.uid,
+            "voters" to listOf(currentUser.uid)
         )
         db.collection("reports").add(report).addOnSuccessListener {
             Toast.makeText(this, "Report Saved!", Toast.LENGTH_SHORT).show()
-            // Recompensă Trust Factor pentru raportare
-            if (currentUser != null && !currentUser.isAnonymous) {
+            if (!currentUser.isAnonymous) {
                 db.collection("users").document(currentUser.uid)
                     .update("trustFactor", FieldValue.increment(10))
             }

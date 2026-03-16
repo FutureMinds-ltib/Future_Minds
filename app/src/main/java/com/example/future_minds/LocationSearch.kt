@@ -81,16 +81,26 @@ class LocationSearch(
     private fun getSuggestions(query: String) {
         geocoder ?: return
 
+        val mapCenter = map.mapCenter as GeoPoint
+        val threshold = 0.1 // 10 - 11 km
+
         executor.execute {
             try {
                 // Simplified the call to be more reliable.
-                val addresses = geocoder!!.getFromLocationName(query, 5)
+                val addresses = geocoder!!.getFromLocationName(
+                    query, 5,
+                    mapCenter.latitude - threshold,
+                    mapCenter.longitude - threshold,
+                    mapCenter.latitude + threshold,
+                    mapCenter.longitude + threshold
+                )
 
                 val suggestions = addresses?.mapNotNull { address ->
                     // Build a readable address line
-                    val addressLine = (0..address.maxAddressLineIndex).joinToString(separator = ", ") { i ->
-                        address.getAddressLine(i)
-                    }
+                    val addressLine =
+                        (0..address.maxAddressLineIndex).joinToString(separator = ", ") { i ->
+                            address.getAddressLine(i)
+                        }
                     if (addressLine.isNotEmpty()) addressLine else null
                 } ?: emptyList()
 

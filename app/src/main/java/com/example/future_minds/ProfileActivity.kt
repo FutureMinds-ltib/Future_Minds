@@ -82,7 +82,7 @@ class ProfileActivity : AppCompatActivity() {
             if (snapshot != null && snapshot.exists()) {
                 val username = snapshot.getString("username") ?: "User"
                 val profileUrl = snapshot.getString("profileImageUrl")
-                val trustFactor = snapshot.getLong("trustFactor")?.toInt() ?: 0
+                val trustFactor = snapshot.getLong("trust")?.toInt() ?: 0
                 val rank = UserRank.fromTrustFactor(trustFactor)
 
                 tvUsername.text = username

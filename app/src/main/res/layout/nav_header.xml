@@ -6,7 +6,8 @@
     android:gravity="bottom"
     android:orientation="horizontal"
     android:padding="16dp"
-    android:theme="@style/ThemeOverlay.AppCompat.Dark">
+    android:theme="@style/ThemeOverlay.AppCompat.Dark"
+    android:fitsSystemWindows="true">
 
     <FrameLayout
         android:layout_width="64dp"

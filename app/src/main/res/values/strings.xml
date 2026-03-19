@@ -11,4 +11,5 @@
         <item>Construction</item>
         <item>Blocked Path</item>
     </string-array>
+    <string name="trust_factor_label">TF: %1$d</string>
 </resources>

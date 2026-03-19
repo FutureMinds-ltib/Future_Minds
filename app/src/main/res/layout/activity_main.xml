@@ -98,25 +98,48 @@
                 android:background="@android:color/transparent" />
         </FrameLayout>
 
-        <Button
-            android:id="@+id/button_route"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentStart="true"
+        <!-- Bottom Buttons Container to align them perfectly -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="110dp"
             android:layout_alignParentBottom="true"
-            android:layout_marginStart="15dp"
-            android:layout_marginBottom="15dp"
-            android:text="Route" />
+            android:layout_marginBottom="5dp">
 
-        <Button
-            android:id="@+id/button_report"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_alignParentBottom="true"
-            android:layout_marginEnd="15dp"
-            android:layout_marginBottom="15dp"
-            android:text="Report" />
+            <Button
+                android:id="@+id/button_route"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="15dp"
+                android:text="Route" />
+
+            <Button
+                android:id="@+id/button_sos"
+                android:layout_width="110dp"
+                android:layout_height="110dp"
+                android:layout_centerInParent="true"
+                android:background="@drawable/bg_sos_button"
+                app:backgroundTint="@null"
+                android:text="SOS"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="28sp"
+                android:padding="0dp"
+                android:gravity="center"
+                android:maxLines="1"
+                android:ellipsize="none" />
+
+            <Button
+                android:id="@+id/button_report"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="15dp"
+                android:text="Report" />
+
+        </RelativeLayout>
 
         <Switch
             android:id="@+id/testare"

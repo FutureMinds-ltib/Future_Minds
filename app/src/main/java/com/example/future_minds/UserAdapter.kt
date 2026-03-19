@@ -38,7 +38,8 @@ class UserAdapter(private val users: List<UserProfile>) : RecyclerView.Adapter<U
         val rank = UserRank.fromTrustFactor(user.trustFactor)
         holder.tvRank.text = rank.displayName
         holder.tvRank.setTextColor(rank.color)
-        holder.tvTrust.text = "TF: ${user.trustFactor}"
+        
+        holder.tvTrust.text = holder.itemView.context.getString(R.string.trust_factor_label, user.trustFactor)
 
         // Apply rank frame
         val gd = GradientDrawable()

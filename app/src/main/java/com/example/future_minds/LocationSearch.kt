@@ -43,13 +43,11 @@ class LocationSearch(
             setupSearchButton()
             setupAutocompleteListener()
         } else {
-            // If geocoder is not present, disable the search bar and inform the user.
             searchBar.isEnabled = false
             searchButton.isEnabled = false
             val warning = "Device location search is not available."
             searchBar.hint = warning
             Toast.makeText(context, warning, Toast.LENGTH_LONG).show()
-            Log.e("LocationSearch", "Geocoder is not present on this device.")
         }
     }
 
@@ -81,37 +79,57 @@ class LocationSearch(
     private fun getSuggestions(query: String) {
         geocoder ?: return
 
-        val mapCenter = map.mapCenter as GeoPoint
-        val threshold = 0.1 // 10 - 11 km
-
         executor.execute {
             try {
-                // Simplified the call to be more reliable.
-                val addresses = geocoder!!.getFromLocationName(
-                    query, 5,
-                    mapCenter.latitude - threshold,
-                    mapCenter.longitude - threshold,
-                    mapCenter.latitude + threshold,
-                    mapCenter.longitude + threshold
-                )
+                // Folosim versiunea mai generală a Geocoder-ului pentru a găsi mai bine POI-urile (mall-uri, parcuri etc.)
+                val addresses = geocoder!!.getFromLocationName(query, 8)
 
                 val suggestions = addresses?.mapNotNull { address ->
-                    // Build a readable address line
-                    val addressLine =
-                        (0..address.maxAddressLineIndex).joinToString(separator = ", ") { i ->
-                            address.getAddressLine(i)
+                    val feature = address.featureName
+                    val street = address.thoroughfare
+                    val locality = address.locality ?: address.adminArea
+                    
+                    var bestName: String? = null
+                    
+                    // Prioritatea 1: Verificăm dacă query-ul utilizatorului apare în vreuna din liniile de adresă
+                    // Geocoder-ul pune deseori numele locației (ex: "AFI Cotroceni") în prima linie, dar nu și în featureName.
+                    for (i in 0..address.maxAddressLineIndex) {
+                        val line = address.getAddressLine(i) ?: continue
+                        if (line.contains(query, ignoreCase = true)) {
+                            // Luăm doar partea relevantă de dinainte de virgulă
+                            bestName = line.split(",")[0].trim()
+                            break
                         }
-                    if (addressLine.isNotEmpty()) addressLine else null
-                } ?: emptyList()
+                    }
+                    
+                    // Prioritatea 2: Dacă nu am găsit meci cu query-ul, verificăm featureName (dacă nu e doar stradă/număr)
+                    if (bestName == null) {
+                        if (feature != null && feature.toIntOrNull() == null && feature != street) {
+                            bestName = feature
+                        }
+                    }
+                    
+                    // Prioritatea 3: Fallback la prima parte a adresei
+                    if (bestName == null) {
+                        bestName = address.getAddressLine(0)?.split(",")?.get(0)?.trim()
+                    }
+
+                    if (bestName == null) return@mapNotNull null
+                    
+                    // Adăugăm orașul pentru context, dacă nu e deja în nume
+                    if (locality != null && !bestName.contains(locality, ignoreCase = true)) {
+                        "$bestName, $locality"
+                    } else {
+                        bestName
+                    }
+                }?.distinct() ?: emptyList()
 
                 mainHandler.post {
                     adapter.setData(suggestions)
                     adapter.notifyDataSetChanged()
                 }
-            } catch (e: IOException) {
-                Log.w("LocationSearch", "Suggestion search failed: Check network. Query: $query", e)
             } catch (e: Exception) {
-                Log.e("LocationSearch", "Suggestion search failed unexpectedly. Query: $query", e)
+                Log.e("LocationSearch", "Suggestions error", e)
             }
         }
     }
@@ -132,24 +150,21 @@ class LocationSearch(
                 if (!results.isNullOrEmpty()) {
                     val location = results[0]
                     val point = GeoPoint(location.latitude, location.longitude)
-                    val title = location.featureName ?: query
+                    // Folosim aceeași logică de nume scurt și pentru titlul markerului
+                    val title = query.capitalize()
                     mainHandler.post { zoomToLocation(point, title) }
                 } else {
                     mainHandler.post { Toast.makeText(context, "Location not found.", Toast.LENGTH_LONG).show() }
                 }
-            } catch (e: IOException) {
-                 mainHandler.post { Toast.makeText(context, "Search failed: Please check network connection.", Toast.LENGTH_LONG).show() }
-                 Log.e("LocationSearch", "Search failed (Network). Query: $query", e)
             } catch (e: Exception) {
-                mainHandler.post { Toast.makeText(context, "An error occurred during search.", Toast.LENGTH_LONG).show() }
-                Log.e("LocationSearch", "Search failed (Unknown). Query: $query", e)
+                Log.e("LocationSearch", "Search error", e)
             }
         }
     }
 
     fun zoomToLocation(point: GeoPoint, title: String) {
-        pnt=point
-        pntBool=true
+        pnt = point
+        pntBool = true
         map.controller.animateTo(point)
         map.controller.setZoom(17.0)
         currentMarker?.let { map.overlays.remove(it) }
@@ -159,12 +174,8 @@ class LocationSearch(
             this.title = title
             showInfoWindow()
         }
-        map.overlays.add(1,currentMarker)
+        map.overlays.add(1, currentMarker)
         map.invalidate()
-
-//        if (context is MainActivity) {
-//            context.calculateSafeRoute(point)
-//        }
     }
 
     class AutoSuggestAdapter(context: Context, resource: Int) : ArrayAdapter<String>(context, resource), Filterable {

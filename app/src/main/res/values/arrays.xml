@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="issue_types">
+        <item>Zona periculoasă - persoane violente</item>
+        <item>Zona periculoasă - câini periculoși</item>
+        <item>Zona periculoasă - furt/violență raportată recent</item>
+        <item>Condiții meteorologice - furtună</item>
+        <item>Condiții meteorologice - vânt puternic</item>
+        <item>Condiții meteorologice - polei</item>
+        <item>Condiții meteorologice - ninsoare abundentă</item>
+        <item>Condiții meteorologice - inundații</item>
+        <item>Drum nesigur - lipsă trotuar</item>
+        <item>Drum nesigur - trotuar blocat</item>
+        <item>Drum nesigur - drum neiluminat</item>
+        <item>Drum nesigur - lipsă trecere pietoni</item>
+        <item>Drum nesigur - trafic cu viteză ridicată</item>
+    </string-array>
+</resources>

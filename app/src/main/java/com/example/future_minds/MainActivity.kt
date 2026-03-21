@@ -673,7 +673,7 @@ class MainActivity : AppCompatActivity() {
                     val lat = document.getDouble("lat") ?: 0.0
                     val lng = document.getDouble("lng") ?: 0.0
                     val radius = document.getDouble("radius") ?: 20.0
-                    val type = document.getString("type") ?: "Unsafe Area"
+                    val type = document.getString("type") ?: "Zona periculoasă"
                     val zoneData = mapOf("lat" to lat, "lng" to lng, "radius" to radius, "type" to type)
                     badZonesList.add(zoneData)
                     addDangerZoneToMap(GeoPoint(lat, lng), radius, type, document.id)
@@ -710,10 +710,10 @@ class MainActivity : AppCompatActivity() {
     private fun addDangerZoneToMap(center: GeoPoint, radius: Double, type: String, reportId: String) {
         val circle = Polygon()
         circle.points = Polygon.pointsAsCircle(center, radius)
-        val color = when (type) {
-            "Unsafe Area" -> Color.argb(100, 255, 0, 0)
-            "Construction" -> Color.argb(100, 255, 165, 0)
-            "Blocked Path" -> Color.argb(100, 0, 0, 0)
+        val color = when {
+            type.startsWith("Zona periculoasă") -> Color.argb(100, 255, 0, 0) // Red
+            type.startsWith("Condiții meteorologice") -> Color.argb(100, 255, 165, 0) // Orange
+            type.startsWith("Drum nesigur") -> Color.argb(100, 0, 0, 0) // Black
             else -> Color.argb(100, 255, 0, 0)
         }
         circle.fillColor = color

@@ -13,6 +13,10 @@
             android:id="@+id/nav_protected"
             android:icon="@android:drawable/ic_menu_view"
             android:title="Protejații mei" />
+        <item
+            android:id="@+id/nav_report_bug"
+            android:icon="@android:drawable/ic_menu_send"
+            android:title="Raportează Bug" />
     </group>
 
     <item android:title="Account Settings">

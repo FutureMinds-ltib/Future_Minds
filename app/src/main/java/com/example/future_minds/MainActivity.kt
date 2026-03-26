@@ -15,6 +15,7 @@ import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -157,6 +158,9 @@ class MainActivity : AppCompatActivity() {
                     val intent = Intent(this, ProtectedActivity::class.java)
                     startActivity(intent)
                 }
+                R.id.nav_report_bug -> {
+                    reportBug()
+                }
                 R.id.nav_logout -> {
                     showSignOutConfirmation()
                 }
@@ -229,6 +233,18 @@ class MainActivity : AppCompatActivity() {
         listenForUserData()
         
         pulseHandler.post(pulseRunnable)
+    }
+
+    private fun reportBug() {
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = Uri.parse("mailto:safewayltib@gmail.com")
+            putExtra(Intent.EXTRA_SUBJECT, "Raport Bug - Future Minds")
+        }
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Nu s-a găsit nicio aplicație de email!", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun listenForProtectedUsersLocations() {

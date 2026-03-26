@@ -82,7 +82,8 @@ class ProfileActivity : AppCompatActivity() {
             if (snapshot != null && snapshot.exists()) {
                 val username = snapshot.getString("username") ?: "User"
                 val profileUrl = snapshot.getString("profileImageUrl")
-                val trustFactor = snapshot.getLong("trust")?.toInt() ?: 0
+                // Corectat: citim trustFactor in loc de trust
+                val trustFactor = snapshot.getLong("trustFactor")?.toInt() ?: 0
                 val rank = UserRank.fromTrustFactor(trustFactor)
 
                 tvUsername.text = username
@@ -141,8 +142,8 @@ class ProfileActivity : AppCompatActivity() {
             .get()
             .addOnSuccessListener { snapshots ->
                 if (isFinishing || isDestroyed) return@addOnSuccessListener
-                val users = snapshots.documents.map { it.data ?: emptyMap<String, Any>() }
-                rvCommunity.adapter = CommunityAdapter(users)
+                val usersList = snapshots.documents.map { it.data ?: emptyMap<String, Any>() }
+                rvCommunity.adapter = CommunityAdapter(usersList)
             }
     }
 

@@ -9,13 +9,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -34,14 +30,17 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.chip.Chip
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -147,19 +146,16 @@ class MainActivity : AppCompatActivity() {
         navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
                 R.id.nav_profile -> {
-                    val intent = Intent(this, ProfileActivity::class.java)
-                    startActivity(intent)
+                    startActivity(Intent(this, ProfileActivity::class.java))
                 }
                 R.id.nav_guardian -> {
-                    val intent = Intent(this, GuardianActivity::class.java)
-                    startActivity(intent)
+                    startActivity(Intent(this, GuardianActivity::class.java))
                 }
                 R.id.nav_protected -> {
-                    val intent = Intent(this, ProtectedActivity::class.java)
-                    startActivity(intent)
+                    startActivity(Intent(this, ProtectedActivity::class.java))
                 }
-                R.id.nav_report_bug -> {
-                    reportBug()
+                R.id.nav_manage_favs -> {
+                    showManageFavoritesDialog()
                 }
                 R.id.nav_logout -> {
                     showSignOutConfirmation()
@@ -185,7 +181,9 @@ class MainActivity : AppCompatActivity() {
         route_btn.setOnClickListener {
             if(locationSearch.pntBool) {
                 calculateSafeRoute(locationSearch.pnt)
-            }else Toast.makeText(this, "You must first select a place", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "Selectează o destinație (căutare sau favorit)", Toast.LENGTH_LONG).show()
+            }
         }
 
         val sosBtn = findViewById<Button>(R.id.button_sos)
@@ -208,6 +206,8 @@ class MainActivity : AppCompatActivity() {
         val searchBar = findViewById<AutoCompleteTextView>(R.id.search_bar)
         val searchButton = findViewById<ImageButton>(R.id.btn_search)
         locationSearch = LocationSearch(this, map, searchBar, searchButton)
+
+        setupFavoriteChips()
 
         val mapEventsReceiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
@@ -235,15 +235,116 @@ class MainActivity : AppCompatActivity() {
         pulseHandler.post(pulseRunnable)
     }
 
-    private fun reportBug() {
-        val intent = Intent(Intent.ACTION_SENDTO).apply {
-            data = Uri.parse("mailto:safewayltib@gmail.com")
-            putExtra(Intent.EXTRA_SUBJECT, "Raport Bug - Future Minds")
+    private fun showManageFavoritesDialog() {
+        val favoriteOptions = arrayOf("Editează Acasă", "Editează Muncă", "Editează Școală")
+        val favoriteKeys = arrayOf("home_location", "work_location", "school_location")
+        val favoriteLabels = arrayOf("Acasă", "Muncă", "Școală")
+
+        AlertDialog.Builder(this)
+            .setTitle("Gestionază locațiile favorite")
+            .setItems(favoriteOptions) { _, which ->
+                showSetFavoriteDialog(favoriteKeys[which], favoriteLabels[which])
+            }
+            .setNegativeButton("Înapoi", null)
+            .show()
+    }
+
+    private fun setupFavoriteChips() {
+        val chipHome = findViewById<Chip>(R.id.chip_home)
+        val chipWork = findViewById<Chip>(R.id.chip_work)
+        val chipSchool = findViewById<Chip>(R.id.chip_school)
+
+        val favoriteKeys = mapOf(
+            chipHome to "home_location",
+            chipWork to "work_location",
+            chipSchool to "school_location"
+        )
+
+        favoriteKeys.forEach { (chip, key) ->
+            chip.setOnClickListener {
+                navigateToFavorite(key, chip.text.toString())
+            }
+            
+            chip.setOnLongClickListener {
+                showSetFavoriteDialog(key, chip.text.toString())
+                true
+            }
         }
-        try {
-            startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(this, "Nu s-a găsit nicio aplicație de email!", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun navigateToFavorite(key: String, label: String) {
+        val uid = auth.currentUser?.uid ?: return
+        
+        db.collection("users").document(uid).get().addOnSuccessListener { doc ->
+            val lat = doc.getDouble("${key}_lat")
+            val lng = doc.getDouble("${key}_lng")
+            
+            if (lat != null && lng != null) {
+                val point = GeoPoint(lat, lng)
+                Toast.makeText(this, "Navigăm către $label...", Toast.LENGTH_SHORT).show()
+                locationSearch.zoomToLocation(point, label)
+                calculateSafeRoute(point)
+            } else {
+                Toast.makeText(this, "Locația $label nu este setată. Folosește 'Gestionaza locațiile favorite' din meniu.", Toast.LENGTH_LONG).show()
+            }
+        }.addOnFailureListener {
+            Toast.makeText(this, "Eroare la preluarea datelor.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showSetFavoriteDialog(key: String, label: String) {
+        val uid = auth.currentUser?.uid ?: return
+        db.collection("users").document(uid).get().addOnSuccessListener { doc ->
+            val existingAddress = doc.getString("${key}_address") ?: ""
+            
+            val builder = AlertDialog.Builder(this)
+            builder.setTitle("Setează/Editează $label")
+            
+            val input = EditText(this)
+            input.hint = "Introdu adresa (ex: Afi Cotroceni)"
+            input.setText(existingAddress)
+            builder.setView(input)
+
+            builder.setPositiveButton("Salvează") { _, _ ->
+                val query = input.text.toString().trim()
+                if (query.isNotEmpty()) {
+                    saveFavoriteLocation(key, query, label)
+                }
+            }
+            builder.setNegativeButton("Anulează", null)
+            builder.show()
+        }
+    }
+
+    private fun saveFavoriteLocation(key: String, query: String, label: String) {
+        val geocoder = android.location.Geocoder(this, Locale.getDefault())
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val results = geocoder.getFromLocationName(query, 1)
+                withContext(Dispatchers.Main) {
+                    if (!results.isNullOrEmpty()) {
+                        val location = results[0]
+                        val uid = auth.currentUser?.uid ?: return@withContext
+                        
+                        val updates = hashMapOf<String, Any>(
+                            "${key}_lat" to location.latitude,
+                            "${key}_lng" to location.longitude,
+                            "${key}_address" to query
+                        )
+                        
+                        db.collection("users").document(uid).update(updates)
+                            .addOnSuccessListener {
+                                Toast.makeText(this@MainActivity, "$label a fost salvat!", Toast.LENGTH_SHORT).show()
+                            }
+                    } else {
+                        Toast.makeText(this@MainActivity, "Adresa nu a fost găsită.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Eroare de căutare.", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -854,10 +955,10 @@ class MainActivity : AppCompatActivity() {
     fun calculateSafeRoute(destination: GeoPoint) {
         val myLocation = locationOverlay.myLocation
         if (myLocation != null) {
-            Toast.makeText(this, "Calculating Safe Route...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Calculăm ruta sigură...", Toast.LENGTH_SHORT).show()
             routeManager.getSafeRoute(myLocation, destination, badZonesList)
         } else {
-            Toast.makeText(this, "Waiting for GPS...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Așteptăm semnalul GPS...", Toast.LENGTH_SHORT).show()
         }
     }
 

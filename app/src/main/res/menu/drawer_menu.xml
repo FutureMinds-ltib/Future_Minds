@@ -13,14 +13,23 @@
             android:id="@+id/nav_protected"
             android:icon="@android:drawable/ic_menu_view"
             android:title="Protejații mei" />
-        <item
-            android:id="@+id/nav_report_bug"
-            android:icon="@android:drawable/ic_menu_send"
-            android:title="Raportează Bug" />
     </group>
 
-    <item android:title="Account Settings">
+    <item android:title="Locații Favorite">
         <menu>
+            <item
+                android:id="@+id/nav_manage_favs"
+                android:icon="@android:drawable/ic_menu_manage"
+                android:title="Gestionază locațiile favorite" />
+        </menu>
+    </item>
+
+    <item android:title="Altele">
+        <menu>
+            <item
+                android:id="@+id/nav_report_bug"
+                android:icon="@android:drawable/ic_menu_send"
+                android:title="Raportează Bug" />
             <item
                 android:id="@+id/nav_logout"
                 android:icon="@android:drawable/ic_lock_power_off"

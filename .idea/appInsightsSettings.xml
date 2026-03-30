@@ -7,6 +7,14 @@
         <entry key="Firebase Crashlytics">
           <value>
             <InsightsFilterSettings>
+              <option name="connection">
+                <ConnectionSetting>
+                  <option name="appId" value="com.example.future_minds" />
+                  <option name="mobileSdkAppId" value="1:779320558810:android:5b9afff4c5fc3b088611e3" />
+                  <option name="projectId" value="future-minds-e7e0f" />
+                  <option name="projectNumber" value="779320558810" />
+                </ConnectionSetting>
+              </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
               <option name="timeIntervalDays" value="THIRTY_DAYS" />
               <option name="visibilityType" value="ALL" />

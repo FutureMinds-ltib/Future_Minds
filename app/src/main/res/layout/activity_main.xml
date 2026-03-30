@@ -16,54 +16,99 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
-        <androidx.cardview.widget.CardView
-            android:id="@+id/search_card"
+        <LinearLayout
+            android:id="@+id/search_container"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
-            android:layout_margin="16dp"
-            android:layout_marginTop="48dp"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="8dp"
-            android:layout_alignParentTop="true">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_alignParentTop="true"
+            android:layout_marginTop="48dp">
 
-            <LinearLayout
+            <androidx.cardview.widget.CardView
+                android:id="@+id/search_card"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="horizontal"
-                android:padding="4dp">
+                android:layout_height="60dp"
+                android:layout_marginHorizontal="16dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="8dp">
 
-                <ImageButton
-                    android:id="@+id/btn_menu"
-                    android:layout_width="48dp"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:src="@android:drawable/ic_menu_sort_by_size"
-                    android:background="?attr/selectableItemBackground"
-                    android:contentDescription="Menu" />
+                    android:orientation="horizontal"
+                    android:padding="4dp">
 
-                <AutoCompleteTextView
-                    android:id="@+id/search_bar"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:hint="Search for a place..."
-                    android:padding="12dp"
-                    android:background="@null"
-                    android:inputType="textPostalAddress|textNoSuggestions"
-                    android:imeOptions="actionSearch"
-                    android:singleLine="true"
-                    android:maxLines="1"
-                    android:dropDownHeight="wrap_content" />
+                    <ImageButton
+                        android:id="@+id/btn_menu"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent"
+                        android:src="@android:drawable/ic_menu_sort_by_size"
+                        android:background="?attr/selectableItemBackground"
+                        android:contentDescription="Menu" />
 
-                <ImageButton
-                    android:id="@+id/btn_search"
-                    android:layout_width="48dp"
-                    android:layout_height="match_parent"
-                    android:src="@android:drawable/ic_menu_search"
-                    android:background="?attr/selectableItemBackground"
-                    android:contentDescription="Search" />
+                    <AutoCompleteTextView
+                        android:id="@+id/search_bar"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:hint="Search for a place..."
+                        android:padding="12dp"
+                        android:background="@null"
+                        android:inputType="textPostalAddress|textNoSuggestions"
+                        android:imeOptions="actionSearch"
+                        android:singleLine="true"
+                        android:maxLines="1"
+                        android:dropDownHeight="wrap_content" />
 
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
+                    <ImageButton
+                        android:id="@+id/btn_search"
+                        android:layout_width="48dp"
+                        android:layout_height="match_parent"
+                        android:src="@android:drawable/ic_menu_search"
+                        android:background="?attr/selectableItemBackground"
+                        android:contentDescription="Search" />
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:scrollbars="none"
+                android:paddingHorizontal="16dp">
+
+                <LinearLayout
+                    android:id="@+id/ll_favorites"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_home"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Acasă"
+                        app:chipIcon="@android:drawable/ic_menu_directions"
+                        android:layout_marginEnd="8dp" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_work"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Muncă"
+                        app:chipIcon="@android:drawable/ic_menu_directions"
+                        android:layout_marginEnd="8dp" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_school"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Școală"
+                        app:chipIcon="@android:drawable/ic_menu_directions" />
+                </LinearLayout>
+            </HorizontalScrollView>
+        </LinearLayout>
 
         <!-- Profile Button in the top right corner -->
         <FrameLayout
@@ -72,7 +117,7 @@
             android:layout_height="56dp"
             android:layout_alignParentTop="true"
             android:layout_alignParentEnd="true"
-            android:layout_marginTop="80dp"
+            android:layout_marginTop="160dp"
             android:layout_marginEnd="16dp"
             android:background="@android:color/transparent">
 
@@ -147,7 +192,7 @@
             android:layout_height="38dp"
             android:layout_alignParentTop="true"
             android:layout_alignParentEnd="true"
-            android:layout_marginTop="140dp"
+            android:layout_marginTop="220dp"
             android:layout_marginEnd="10dp"
             android:text="Testare"
             tools:ignore="UseSwitchCompatOrMaterialXml" />

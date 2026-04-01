@@ -1,0 +1,59 @@
+Index: app/src/main/java/com/example/future_minds/ProfileActivity.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.example.future_minds\r\n\r\nimport android.app.Activity\r\nimport android.content.Intent\r\nimport android.graphics.drawable.GradientDrawable\r\nimport android.net.Uri\r\nimport android.os.Bundle\r\nimport android.view.View\r\nimport android.widget.Button\r\nimport android.widget.ImageButton\r\nimport android.widget.ImageView\r\nimport android.widget.TextView\r\nimport android.widget.Toast\r\nimport androidx.activity.result.contract.ActivityResultContracts\r\nimport androidx.appcompat.app.AppCompatActivity\r\nimport androidx.recyclerview.widget.LinearLayoutManager\r\nimport androidx.recyclerview.widget.RecyclerView\r\nimport com.bumptech.glide.Glide\r\nimport com.google.firebase.auth.FirebaseAuth\r\nimport com.google.firebase.firestore.FirebaseFirestore\r\nimport com.google.firebase.firestore.Query\r\nimport com.google.firebase.storage.FirebaseStorage\r\n\r\nclass ProfileActivity : AppCompatActivity() {\r\n\r\n    private lateinit var auth: FirebaseAuth\r\n    private lateinit var db: FirebaseFirestore\r\n    private lateinit var storage: FirebaseStorage\r\n\r\n    private lateinit var ivProfileLarge: ImageView\r\n    private lateinit var rankFrame: View\r\n    private lateinit var tvUsername: TextView\r\n    private lateinit var tvRank: TextView\r\n    private lateinit var tvTrustFactor: TextView\r\n    private lateinit var rvCommunity: RecyclerView\r\n\r\n    private var selectedImageUri: Uri? = null\r\n\r\n    private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->\r\n        if (result.resultCode == Activity.RESULT_OK) {\r\n            selectedImageUri = result.data?.data\r\n            selectedImageUri?.let { uploadProfilePicture(it) }\r\n        }\r\n    }\r\n\r\n    override fun onCreate(savedInstanceState: Bundle?) {\r\n        super.onCreate(savedInstanceState)\r\n        setContentView(R.layout.activity_profile)\r\n\r\n        auth = FirebaseAuth.getInstance()\r\n        db = FirebaseFirestore.getInstance()\r\n        storage = FirebaseStorage.getInstance()\r\n\r\n        ivProfileLarge = findViewById(R.id.iv_profile_large)\r\n        rankFrame = findViewById(R.id.rank_frame)\r\n        tvUsername = findViewById(R.id.tv_profile_username)\r\n        tvRank = findViewById(R.id.tv_profile_rank)\r\n        tvTrustFactor = findViewById(R.id.tv_trust_factor)\r\n        rvCommunity = findViewById(R.id.rv_community_ranks)\r\n\r\n        findViewById<ImageButton>(R.id.btn_profile_back).setOnClickListener {\r\n            finish()\r\n        }\r\n\r\n        findViewById<Button>(R.id.btn_change_photo).setOnClickListener {\r\n            val intent = Intent(Intent.ACTION_PICK)\r\n            intent.type = \"image/*\"\r\n            pickImageLauncher.launch(intent)\r\n        }\r\n\r\n        findViewById<Button>(R.id.btn_remove_photo).setOnClickListener {\r\n            removeProfilePicture()\r\n        }\r\n\r\n        loadUserData()\r\n        loadCommunityRanking()\r\n    }\r\n\r\n    private fun loadUserData() {\r\n        val uid = auth.currentUser?.uid ?: return\r\n        db.collection(\"users\").document(uid).addSnapshotListener { snapshot, _ ->\r\n            if (snapshot != null && snapshot.exists()) {\r\n                val username = snapshot.getString(\"username\") ?: \"User\"\r\n                val trustFactor = snapshot.getLong(\"trustFactor\")?.toInt() ?: 0\r\n                val profileUrl = snapshot.getString(\"profileImageUrl\")\r\n\r\n                tvUsername.text = username\r\n                tvTrustFactor.text = \"Trust Factor: $trustFactor\"\r\n                \r\n                val rank = UserRank.fromTrustFactor(trustFactor)\r\n                tvRank.text = \"Rank: ${rank.displayName}\"\r\n                tvRank.setTextColor(rank.color)\r\n                \r\n                applyRankFrame(rankFrame, rank)\r\n\r\n                if (!isFinishing) {\r\n                    Glide.with(this)\r\n                        .load(profileUrl ?: android.R.drawable.ic_menu_gallery)\r\n                        .circleCrop()\r\n                        .into(ivProfileLarge)\r\n                }\r\n            }\r\n        }\r\n    }\r\n\r\n    private fun applyRankFrame(view: View, rank: UserRank) {\r\n        val strokeWidth = 8\r\n        val gd = GradientDrawable()\r\n        gd.setColor(android.graphics.Color.TRANSPARENT)\r\n        gd.setStroke(strokeWidth, rank.color)\r\n        gd.shape = GradientDrawable.OVAL\r\n        \r\n        if (rank == UserRank.SCOLAR_PATRON) {\r\n            gd.setStroke(12, rank.color, 10f, 5f)\r\n        }\r\n        \r\n        view.background = gd\r\n    }\r\n\r\n    private fun uploadProfilePicture(uri: Uri) {\r\n        val uid = auth.currentUser?.uid ?: return\r\n        val ref = storage.reference.child(\"profile_pictures/$uid.jpg\")\r\n\r\n        ref.putFile(uri).addOnSuccessListener {\r\n            ref.downloadUrl.addOnSuccessListener { downloadUri ->\r\n                db.collection(\"users\").document(uid)\r\n                    .update(\"profileImageUrl\", downloadUri.toString())\r\n                    .addOnSuccessListener {\r\n                        Toast.makeText(this, \"Profile picture updated!\", Toast.LENGTH_SHORT).show()\r\n                    }\r\n            }\r\n        }.addOnFailureListener {\r\n            Toast.makeText(this, \"Upload failed: ${it.message}\", Toast.LENGTH_SHORT).show()\r\n        }\r\n    }\r\n\r\n    private fun removeProfilePicture() {\r\n        val uid = auth.currentUser?.uid ?: return\r\n        db.collection(\"users\").document(uid)\r\n            .update(\"profileImageUrl\", null)\r\n            .addOnSuccessListener {\r\n                Toast.makeText(this, \"Profile picture removed!\", Toast.LENGTH_SHORT).show()\r\n            }\r\n    }\r\n\r\n    private fun loadCommunityRanking() {\r\n        db.collection(\"users\")\r\n            .orderBy(\"trustFactor\", Query.Direction.DESCENDING)\r\n            .limit(10)\r\n            .get()\r\n            .addOnSuccessListener { documents ->\r\n                val userList = mutableListOf<UserProfile>()\r\n                for (doc in documents) {\r\n                    val user = doc.toObject(UserProfile::class.java).copy(uid = doc.id)\r\n                    userList.add(user)\r\n                }\r\n                rvCommunity.layoutManager = LinearLayoutManager(this)\r\n                rvCommunity.adapter = UserAdapter(userList)\r\n            }\r\n    }\r\n}
+===================================================================
+diff --git a/app/src/main/java/com/example/future_minds/ProfileActivity.kt b/app/src/main/java/com/example/future_minds/ProfileActivity.kt
+--- a/app/src/main/java/com/example/future_minds/ProfileActivity.kt	(revision cc1580a44de7bb8ddf6612c99b8d786337231704)
++++ b/app/src/main/java/com/example/future_minds/ProfileActivity.kt	(date 1773568968648)
+@@ -2,15 +2,12 @@
+ 
+ import android.app.Activity
+ import android.content.Intent
++import android.graphics.Color
+ import android.graphics.drawable.GradientDrawable
+ import android.net.Uri
+ import android.os.Bundle
+ import android.view.View
+-import android.widget.Button
+-import android.widget.ImageButton
+-import android.widget.ImageView
+-import android.widget.TextView
+-import android.widget.Toast
++import android.widget.*
+ import androidx.activity.result.contract.ActivityResultContracts
+ import androidx.appcompat.app.AppCompatActivity
+ import androidx.recyclerview.widget.LinearLayoutManager
+@@ -106,11 +103,12 @@
+     private fun applyRankFrame(view: View, rank: UserRank) {
+         val strokeWidth = 8
+         val gd = GradientDrawable()
+-        gd.setColor(android.graphics.Color.TRANSPARENT)
++        gd.setColor(Color.TRANSPARENT)
+         gd.setStroke(strokeWidth, rank.color)
+         gd.shape = GradientDrawable.OVAL
+         
+-        if (rank == UserRank.SCOLAR_PATRON) {
++        // Example of a special case for a specific rank
++        if (rank.displayName.contains("PATRON", ignoreCase = true)) {
+             gd.setStroke(12, rank.color, 10f, 5f)
+         }
+         
+@@ -129,8 +127,8 @@
+                         Toast.makeText(this, "Profile picture updated!", Toast.LENGTH_SHORT).show()
+                     }
+             }
+-        }.addOnFailureListener {
+-            Toast.makeText(this, "Upload failed: ${it.message}", Toast.LENGTH_SHORT).show()
++        }.addOnFailureListener { e ->
++            Toast.makeText(this, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+         }
+     }
+ 
+@@ -158,4 +156,4 @@
+                 rvCommunity.adapter = UserAdapter(userList)
+             }
+     }
+-}
+\ No newline at end of file
++}

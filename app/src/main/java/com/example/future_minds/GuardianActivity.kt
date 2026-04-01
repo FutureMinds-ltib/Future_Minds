@@ -35,13 +35,33 @@ class GuardianActivity : AppCompatActivity() {
             val gPhone = etPhone.text.toString().trim()
 
             if (gUsername.isNotEmpty() && gPhone.isNotEmpty()) {
-                checkGuardianExists(gUsername, gPhone)
+                // PAS 1: Verificăm dacă utilizatorul curent (EU) are numărul verificat
+                checkMyVerificationStatus { isMeVerified ->
+                    if (isMeVerified) {
+                        // PAS 2: Dacă eu sunt OK, verificăm și gardianul
+                        checkGuardianExists(gUsername, gPhone)
+                    } else {
+                        Toast.makeText(this, "Numărul tău de telefon nu este confirmat! Verifică-l în 'Date Personale'.", Toast.LENGTH_LONG).show()
+                    }
+                }
             } else {
                 Toast.makeText(this, "Completează toate câmpurile!", Toast.LENGTH_SHORT).show()
             }
         }
 
         btnBack.setOnClickListener { finish() }
+    }
+
+    private fun checkMyVerificationStatus(callback: (Boolean) -> Unit) {
+        val currentUser = auth.currentUser ?: return
+        db.collection("users").document(currentUser.uid).get()
+            .addOnSuccessListener { doc ->
+                val verified = doc.getBoolean("phoneVerified") ?: false
+                callback(verified)
+            }
+            .addOnFailureListener {
+                callback(false)
+            }
     }
 
     private fun loadMyGuardians() {
@@ -107,9 +127,14 @@ class GuardianActivity : AppCompatActivity() {
                     val guardianDoc = documents.documents[0]
                     val guardianUid = guardianDoc.id
                     val actualPhone = guardianDoc.getString("phone")
+                    val isPhoneVerified = guardianDoc.getBoolean("phoneVerified") ?: false
 
                     if (actualPhone == phone) {
-                        sendGuardianRequest(guardianUid, username)
+                        if (isPhoneVerified) {
+                            sendGuardianRequest(guardianUid, username)
+                        } else {
+                            Toast.makeText(this, "Utilizatorul $username nu poate fi adăugat ca gardian deoarece nu are numărul de telefon confirmat.", Toast.LENGTH_LONG).show()
+                        }
                     } else {
                         Toast.makeText(this, "Numărul de telefon nu corespunde!", Toast.LENGTH_LONG).show()
                     }

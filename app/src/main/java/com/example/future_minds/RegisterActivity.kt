@@ -32,7 +32,7 @@ class RegisterActivity : AppCompatActivity() {
             val email = etEmail.text.toString().trim()
             val pass = etPassword.text.toString().trim()
             val phone = etPhone.text.toString().trim()
-            val trustFactor = 100 // Standardized name
+            val trustFactor = 100 
 
             if (username.isNotEmpty() && email.isNotEmpty() && pass.isNotEmpty() && phone.isNotEmpty()) {
                 auth.createUserWithEmailAndPassword(email, pass)
@@ -44,6 +44,7 @@ class RegisterActivity : AppCompatActivity() {
                                 "username" to username,
                                 "email" to email,
                                 "phone" to phone,
+                                "phoneVerified" to false, // Set initially to false
                                 "trustFactor" to trustFactor
                             )
 

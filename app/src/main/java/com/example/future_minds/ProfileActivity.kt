@@ -138,12 +138,13 @@ class ProfileActivity : AppCompatActivity() {
         rvCommunity.layoutManager = LinearLayoutManager(this)
         db.collection("users")
             .orderBy("trustFactor", Query.Direction.DESCENDING)
-            .limit(10)
-            .get()
-            .addOnSuccessListener { snapshots ->
-                if (isFinishing || isDestroyed) return@addOnSuccessListener
-                val usersList = snapshots.documents.map { it.data ?: emptyMap<String, Any>() }
-                rvCommunity.adapter = CommunityAdapter(usersList)
+            .limit(20)
+            .addSnapshotListener { snapshots, _ ->
+                if (isFinishing || isDestroyed) return@addSnapshotListener
+                if (snapshots != null) {
+                    val usersList = snapshots.documents.map { it.data ?: emptyMap<String, Any>() }
+                    rvCommunity.adapter = CommunityAdapter(usersList)
+                }
             }
     }
 

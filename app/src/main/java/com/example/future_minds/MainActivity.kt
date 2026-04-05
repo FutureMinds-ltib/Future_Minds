@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -24,7 +25,6 @@ import androidx.core.graphics.applyCanvas
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.graphics.scale
-import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -74,7 +74,7 @@ class MainActivity : AppCompatActivity() {
     private var connectionsListener: ListenerRegistration? = null
     private val userLocationListeners = mutableMapOf<String, ListenerRegistration>()
     
-    private val usersInEmergency = mutableMapOf<String, Long>() // uid to expiry timestamp
+    private val usersInEmergency = mutableMapOf<String, Long>()
     private val userProfileUrls = mutableMapOf<String, String?>()
     private val userBitmaps = mutableMapOf<String, Bitmap>()
     private val pulseHandler = Handler(Looper.getMainLooper())
@@ -87,32 +87,14 @@ class MainActivity : AppCompatActivity() {
     private val pulseRunnable = object : Runnable {
         override fun run() {
             if (usersInEmergency.isNotEmpty()) {
-                val currentTime = System.currentTimeMillis()
-                val iterator = usersInEmergency.entries.iterator()
-                var listChanged = false
-                while (iterator.hasNext()) {
-                    val entry = iterator.next()
-                    if (currentTime > entry.value) {
-                        val uid = entry.key
-                        iterator.remove()
-                        refreshMarkerIcon(uid)
-                        listChanged = true
-                    }
-                }
-
-                if (usersInEmergency.isNotEmpty()) {
-                    pulseAlpha += pulseDirection
-                    if (pulseAlpha !in 61..219) pulseDirection *= -1
-                    
-                    for (uid in usersInEmergency.keys) {
-                        refreshMarkerIcon(uid)
-                    }
-                    map.invalidate()
-                } else if (listChanged) {
-                    map.invalidate()
-                }
+                pulseAlpha += pulseDirection
+                if (pulseAlpha <= 60 || pulseAlpha >= 220) pulseDirection *= -1
+                
+                usersInEmergency.keys.forEach { uid -> refreshMarkerIcon(uid) }
+                map.invalidate()
             }
-            pulseHandler.postDelayed(this, 100)
+            // Lag reduction: 500ms instead of 100ms
+            pulseHandler.postDelayed(this, 500)
         }
     }
 
@@ -121,25 +103,33 @@ class MainActivity : AppCompatActivity() {
             if (isGranted) {
                 setupLocationOverlay()
             } else {
-                Toast.makeText(this, "Location permission is required for navigation!", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Permisiunea de locație este necesară!", Toast.LENGTH_LONG).show()
             }
         }
 
-    @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
         val sharedPrefs = getSharedPreferences("${packageName}_preferences", MODE_PRIVATE)
         Configuration.getInstance().load(this, sharedPrefs)
+        Configuration.getInstance().userAgentValue = packageName
+
         setContentView(R.layout.activity_main)
 
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
 
+        if (auth.currentUser == null) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
+
         drawerLayout = findViewById(R.id.drawer_layout)
         val navView = findViewById<NavigationView>(R.id.nav_view)
         val btnMenu = findViewById<ImageButton>(R.id.btn_menu)
 
-        btnMenu.setOnClickListener {
+        btnMenu?.setOnClickListener {
             drawerLayout.openDrawer(GravityCompat.START)
         }
 
@@ -149,27 +139,16 @@ class MainActivity : AppCompatActivity() {
         listenForSosAlerts()
         listenForProtectedUsersLocations()
 
-        navView.setNavigationItemSelectedListener { menuItem ->
-            Log.d("Navigation", "Item clicked: ${menuItem.title}")
+        navView?.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.nav_profile -> {
-                    startActivity(Intent(this, ProfileActivity::class.java))
-                }
-                R.id.nav_personal_data -> {
-                    startActivity(Intent(this, PersonalDataActivity::class.java))
-                }
-                R.id.nav_guardian -> {
-                    startActivity(Intent(this, GuardianActivity::class.java))
-                }
-                R.id.nav_protected -> {
-                    startActivity(Intent(this, ProtectedActivity::class.java))
-                }
-                R.id.nav_report_bug -> {
-                    reportBug()
-                }
-                R.id.nav_logout -> {
-                    showSignOutConfirmation()
-                }
+                R.id.nav_profile -> startActivity(Intent(this, ProfileActivity::class.java))
+                R.id.nav_personal_data -> startActivity(Intent(this, PersonalDataActivity::class.java))
+                R.id.nav_guardian -> startActivity(Intent(this, GuardianActivity::class.java))
+                R.id.nav_protected -> startActivity(Intent(this, ProtectedActivity::class.java))
+                R.id.nav_manage_favs -> startActivity(Intent(this, FavoritesActivity::class.java))
+                R.id.nav_report_bug -> reportBug()
+                R.id.nav_report_city -> openCityReport()
+                R.id.nav_logout -> showSignOutConfirmation()
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
@@ -179,56 +158,45 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, ProfileActivity::class.java))
         }
 
+        // Map Initialization
         map = findViewById(R.id.map)
         map.setTileSource(TileSourceFactory.MAPNIK)
         map.setMultiTouchControls(true)
+        map.controller.setZoom(15.0)
+        map.controller.setCenter(GeoPoint(44.4268, 26.1025))
 
         val reportBtn = findViewById<ImageButton>(R.id.button_report)
-        reportBtn.setOnClickListener { isReportMode = true }
+        reportBtn?.setOnClickListener { 
+            isReportMode = true 
+            Toast.makeText(this, "Apasă lung pe hartă pentru a raporta!", Toast.LENGTH_SHORT).show()
+        }
 
-        val routeBtn = findViewById<ImageButton>(R.id.button_route)
-        routeBtn.setOnClickListener {
-            if(locationSearch.pntBool) {
-                calculateSafeRoute(locationSearch.pnt)
-            } else Toast.makeText(this, "You must first select a place", Toast.LENGTH_LONG).show()
+        val testBtn = findViewById<MaterialSwitch>(R.id.testare)
+        testBtn?.setOnCheckedChangeListener { _, isChecked ->
+            isTestMode = isChecked
+            Toast.makeText(this, if (isTestMode) "Test Mode ON" else "Test Mode OFF", Toast.LENGTH_SHORT).show()
         }
 
         val sosBtn = findViewById<Button>(R.id.button_sos)
-        sosBtn.setOnClickListener {
-            sendSosAlert()
-        }
+        sosBtn?.setOnClickListener { sendSosAlert() }
 
-        val modTestare = findViewById<MaterialSwitch>(R.id.testare)
-        modTestare?.setOnCheckedChangeListener { _, isChecked ->
-            isTestMode = isChecked
-        }
-
-        val mapController = map.controller
-        mapController.setZoom(15.0)
-        val startPoint = GeoPoint(44.420483, 26.061319)
-        mapController.setCenter(startPoint)
-
-        routeManager = RouteManager(this, map)
         val searchBar = findViewById<AutoCompleteTextView>(R.id.search_bar)
-        val searchButton = findViewById<ImageButton>(R.id.btn_search)
-        locationSearch = LocationSearch(this, map, searchBar, searchButton)
+        val searchBtn = findViewById<ImageButton>(R.id.btn_search)
+        locationSearch = LocationSearch(this, map, searchBar, searchBtn)
+        routeManager = RouteManager(this, map)
 
-        // Setup Chips (Favorite shortcuts)
         setupFavoriteChips()
 
         val mapEventsReceiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
             override fun longPressHelper(p: GeoPoint?): Boolean {
                 p?.let {
-                    if(isTestMode){
-                        if(isReportMode){
-                            showReportDialog(it)
-                            isReportMode = false
-                        }else{
-                            locationSearch.zoomToLocation(it,"Pin")
-                        }
+                    if(isReportMode){
+                        showReportDialog(it)
+                        isReportMode = false
+                    } else if (isTestMode) {
+                        locationSearch.zoomToLocation(it, "Pin")
                     }
-
                 }
                 return true
             }
@@ -252,34 +220,53 @@ class MainActivity : AppCompatActivity() {
             if (snapshot != null && snapshot.exists()) {
                 val favorites = snapshot.get("favorites") as? Map<*, *>
                 
-                chipHome.setOnClickListener {
-                    val address = favorites?.get("home") as? String
-                    if (!address.isNullOrEmpty()) {
-                        locationSearch.performSearch(address)
-                    } else {
-                        Toast.makeText(this, "Adresa 'Home' nu este setată!", Toast.LENGTH_SHORT).show()
-                    }
+                chipHome?.setOnClickListener {
+                    (favorites?.get("home") as? String)?.let { address ->
+                        Toast.makeText(this, "Calculăm traseu spre Casă...", Toast.LENGTH_SHORT).show()
+                        calculateRouteToAddress(address)
+                    } ?: Toast.makeText(this, "Adresa 'Home' nu este setată!", Toast.LENGTH_SHORT).show()
                 }
                 
-                chipSchool.setOnClickListener {
-                    val address = favorites?.get("school") as? String
-                    if (!address.isNullOrEmpty()) {
-                        locationSearch.performSearch(address)
-                    } else {
-                        Toast.makeText(this, "Adresa 'School' nu este setată!", Toast.LENGTH_SHORT).show()
-                    }
+                chipSchool?.setOnClickListener {
+                    (favorites?.get("school") as? String)?.let { address ->
+                        Toast.makeText(this, "Calculăm traseu spre Școală...", Toast.LENGTH_SHORT).show()
+                        calculateRouteToAddress(address)
+                    } ?: Toast.makeText(this, "Adresa 'School' nu este setată!", Toast.LENGTH_SHORT).show()
                 }
                 
-                chipPark.setOnClickListener {
-                    val address = favorites?.get("park") as? String
-                    if (!address.isNullOrEmpty()) {
-                        locationSearch.performSearch(address)
-                    } else {
-                        Toast.makeText(this, "Adresa 'Park' nu este setată!", Toast.LENGTH_SHORT).show()
-                    }
+                chipPark?.setOnClickListener {
+                    (favorites?.get("park") as? String)?.let { address ->
+                        Toast.makeText(this, "Calculăm traseu spre Parc...", Toast.LENGTH_SHORT).show()
+                        calculateRouteToAddress(address)
+                    } ?: Toast.makeText(this, "Adresa 'Park' nu este setată!", Toast.LENGTH_SHORT).show()
                 }
             }
         }
+    }
+
+    private fun calculateRouteToAddress(address: String) {
+        val geocoder = android.location.Geocoder(this, Locale.getDefault())
+        lifecycleScope.launch {
+            try {
+                val results = geocoder.getFromLocationName(address, 1)
+                if (!results.isNullOrEmpty()) {
+                    val location = results[0]
+                    val destination = GeoPoint(location.latitude, location.longitude)
+                    locationSearch.zoomToLocation(destination, address)
+                    calculateSafeRoute(destination)
+                } else {
+                    Toast.makeText(this@MainActivity, "Adresa nu a fost găsită!", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error finding address", e)
+            }
+        }
+    }
+
+    private fun openCityReport() {
+        val url = "https://www.pmb.ro/interes-public/informatii/formuleaza-petitie"
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        startActivity(intent)
     }
 
     private fun reportBug() {
@@ -294,71 +281,364 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun calculateSafeRoute(destination: GeoPoint) {
+        if (!::locationOverlay.isInitialized) return
+        locationOverlay.myLocation?.let {
+            routeManager.getSafeRoute(it, destination, badZonesList)
+        } ?: Toast.makeText(this, "Așteaptă GPS...", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun setupLocationOverlay() {
+        if (!::map.isInitialized) return
+        
+        locationOverlay = object : MyLocationNewOverlay(GpsMyLocationProvider(this), map) {
+            override fun onLocationChanged(location: android.location.Location?, source: IMyLocationProvider?) {
+                super.onLocationChanged(location, source)
+                location?.let { updateMyLocationInFirestore(it.latitude, it.longitude) }
+            }
+        }
+
+        val size = 60
+        val bitmap = createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        bitmap.applyCanvas {
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            paint.color = Color.WHITE
+            drawCircle(size / 2f, size / 2f, size / 2f, paint)
+            paint.color = Color.parseColor("#1A73E8") 
+            drawCircle(size / 2f, size / 2f, (size / 2f) - 6, paint)
+        }
+        
+        locationOverlay.setPersonIcon(bitmap)
+        locationOverlay.setDirectionIcon(bitmap)
+        @Suppress("DEPRECATION")
+        locationOverlay.setPersonHotspot(size / 2f, size / 2f)
+        
+        locationOverlay.enableMyLocation()
+        map.overlays.add(locationOverlay)
+    }
+
+    private fun updateMyLocationInFirestore(lat: Double, lon: Double) {
+        val uid = auth.currentUser?.uid ?: return
+        db.collection("users").document(uid).update(
+            "latitude", lat,
+            "longitude", lon,
+            "lastSeen", FieldValue.serverTimestamp()
+        )
+    }
+
+    private fun checkLocationPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            setupLocationOverlay()
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    private fun listenForDangerZones() {
+        db.collection("danger_zones").addSnapshotListener { snapshot, _ ->
+            if (snapshot != null) {
+                badZonesList.clear()
+                dangerZoneOverlays.forEach { map.overlays.remove(it) }
+                dangerZoneOverlays.clear()
+                
+                for (doc in snapshot.documents) {
+                    val lat = doc.getDouble("lat") ?: 0.0
+                    val lon = doc.getDouble("lon") ?: 0.0
+                    val radius = doc.getDouble("radius") ?: 100.0
+                    val type = doc.getString("type") ?: "warning"
+                    
+                    badZonesList.add(mapOf("lat" to lat, "lon" to lon, "radius" to radius))
+                    
+                    val circle = Polygon()
+                    circle.points = Polygon.pointsAsCircle(GeoPoint(lat, lon), radius)
+                    circle.fillPaint.color = if (type == "danger") Color.argb(80, 255, 0, 0) else Color.argb(80, 255, 165, 0)
+                    circle.outlinePaint.color = Color.TRANSPARENT
+                    map.overlays.add(circle)
+                    dangerZoneOverlays.add(circle)
+                }
+                map.invalidate()
+            }
+        }
+    }
+
+    private fun showReportDialog(point: GeoPoint) {
+        val dialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.raportari, findViewById(android.R.id.content), false)
+        
+        val spinner = view.findViewById<Spinner>(R.id.spinner_issue_type)
+        val seekBar = view.findViewById<SeekBar>(R.id.seekbar_radius)
+        val tvRadius = view.findViewById<TextView>(R.id.tv_radius_label)
+        
+        seekBar?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                tvRadius?.text = getString(R.string.affected_area_format, progress)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        val btnSubmit = Button(this).apply { text = getString(R.string.submit_report) }
+        (view as? LinearLayout)?.addView(btnSubmit)
+
+        btnSubmit.setOnClickListener {
+            val type = spinner?.selectedItem?.toString() ?: "warning"
+            val radius = seekBar?.progress?.toDouble() ?: 20.0
+            
+            val report = hashMapOf(
+                "lat" to point.latitude,
+                "lon" to point.longitude,
+                "description" to type,
+                "type" to if (type.contains("pericol", ignoreCase = true) || type.contains("danger", ignoreCase = true)) "danger" else "warning",
+                "radius" to radius,
+                "timestamp" to FieldValue.serverTimestamp(),
+                "reportedBy" to auth.currentUser?.uid
+            )
+            db.collection("danger_zones").add(report).addOnSuccessListener {
+                Toast.makeText(this, "Raport trimis! Mulțumim.", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+            }
+        }
+
+        dialog.setContentView(view)
+        dialog.show()
+    }
+
+    private fun sendSosAlert() {
+        val currentUser = auth.currentUser ?: return
+        db.collection("users").document(currentUser.uid).get().addOnSuccessListener { userDoc ->
+            val username = userDoc.getString("username") ?: "Cineva"
+            db.collection("connections")
+                .whereEqualTo("protectedUid", currentUser.uid)
+                .whereEqualTo("status", "accepted")
+                .get()
+                .addOnSuccessListener { connections ->
+                    if (connections.isEmpty) {
+                        Toast.makeText(this, "Nu ai gardieni!", Toast.LENGTH_SHORT).show()
+                        return@addOnSuccessListener
+                    }
+                    
+                    for (doc in connections) {
+                        db.collection("connections").document(doc.id).update("shareLocation", true)
+                        
+                        val alert = hashMapOf(
+                            "guardianUid" to doc.getString("guardianUid"),
+                            "protectedUid" to currentUser.uid,
+                            "protectedUsername" to username,
+                            "message" to "$username are nevoie de ajutor!",
+                            "timestamp" to FieldValue.serverTimestamp(),
+                            "status" to "new"
+                        )
+                        db.collection("sos_alerts").add(alert)
+                    }
+                    Toast.makeText(this, "SOS trimis gardienilor și locația activată pentru toți!", Toast.LENGTH_LONG).show()
+                    locationOverlay.myLocation?.let { updateMyLocationInFirestore(it.latitude, it.longitude) }
+                }
+        }
+    }
+
+    private fun listenForSosAlerts() {
+        val currentUser = auth.currentUser ?: return
+        db.collection("sos_alerts")
+            .whereEqualTo("guardianUid", currentUser.uid)
+            .whereEqualTo("status", "new")
+            .addSnapshotListener { snapshots, _ ->
+                snapshots?.documentChanges?.forEach { doc ->
+                    if (doc.type == com.google.firebase.firestore.DocumentChange.Type.ADDED) {
+                        val msg = doc.document.getString("message") ?: "Alertă SOS!"
+                        val pUid = doc.document.getString("protectedUid") ?: ""
+                        if (pUid.isNotEmpty()) {
+                            usersInEmergency[pUid] = System.currentTimeMillis() + 3600000
+                        }
+                        showSosDialog(msg, doc.document.id)
+                    }
+                }
+            }
+    }
+
+    private fun showSosDialog(message: String, alertId: String) {
+        AlertDialog.Builder(this)
+            .setTitle("ALERTĂ SOS!")
+            .setMessage(message)
+            .setPositiveButton("OK") { _, _ ->
+                db.collection("sos_alerts").document(alertId).update("status", "read")
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun showSignOutConfirmation() {
+        AlertDialog.Builder(this)
+            .setMessage("Ieși din cont?")
+            .setPositiveButton("Da") { _, _ -> signOut() }
+            .setNegativeButton("Nu", null)
+            .show()
+    }
+
+    private fun signOut() {
+        auth.signOut()
+        startActivity(Intent(this, LoginActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        })
+        finish()
+    }
+
+    private fun listenForUserData() {
+        val uid = auth.currentUser?.uid ?: return
+        val ivMainProfile = findViewById<ImageView>(R.id.iv_main_profile)
+        val mainRankFrame = findViewById<View>(R.id.main_rank_frame)
+
+        db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
+            if (snapshot != null && snapshot.exists()) {
+                val profileUrl = snapshot.getString("profileImageUrl")
+                val trust = snapshot.getLong("trustFactor")?.toInt() ?: 0
+                val rank = UserRank.fromTrustFactor(trust)
+
+                if (mainRankFrame != null) applyRankFrame(mainRankFrame, rank)
+                if (!isFinishing && ivMainProfile != null) {
+                    Glide.with(this).load(profileUrl ?: android.R.drawable.ic_menu_gallery).circleCrop().into(ivMainProfile)
+                }
+            }
+        }
+    }
+
+    private fun applyRankFrame(view: View, rank: UserRank) {
+        val gd = GradientDrawable()
+        gd.setColor(Color.TRANSPARENT)
+        gd.setStroke(8, rank.color)
+        gd.shape = GradientDrawable.OVAL
+        view.background = gd
+    }
+
+    private fun setupNavigationHeader(navView: NavigationView) {
+        val header = navView.getHeaderView(0)
+        val tvUser = header.findViewById<TextView>(R.id.tv_username)
+        val tvRank = header.findViewById<TextView>(R.id.tv_nav_rank)
+        val ivPhoto = header.findViewById<ImageView>(R.id.iv_user_photo)
+        val rankFrame = header.findViewById<View>(R.id.nav_rank_frame)
+        
+        header.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
+            drawerLayout.closeDrawer(GravityCompat.START)
+        }
+        
+        auth.currentUser?.let { user ->
+            db.collection("users").document(user.uid).addSnapshotListener { doc, _ ->
+                if (doc != null && doc.exists()) {
+                    val trust = doc.getLong("trustFactor")?.toInt() ?: 0
+                    val rank = UserRank.fromTrustFactor(trust)
+                    tvUser.text = doc.getString("username")
+                    tvRank.text = rank.displayName
+                    tvRank.setTextColor(rank.color)
+                    if (rankFrame != null) applyRankFrame(rankFrame, rank)
+                    if (!isFinishing) Glide.with(this).load(doc.getString("profileImageUrl") ?: android.R.drawable.ic_menu_gallery).circleCrop().into(ivPhoto)
+                }
+            }
+        }
+    }
+
+    private fun migrateOldGuardianData() {
+        val user = auth.currentUser ?: return
+        db.collection("users").document(user.uid).get().addOnSuccessListener { doc ->
+            val oldGuardian = doc.getString("guardian")
+            if (!oldGuardian.isNullOrEmpty()) {
+                db.collection("users").whereEqualTo("username", oldGuardian).get().addOnSuccessListener { guards ->
+                    if (!guards.isEmpty) {
+                        val gUid = guards.documents[0].id
+                        val connection = hashMapOf(
+                            "protectedUid" to user.uid,
+                            "protectedUsername" to (doc.getString("username") ?: "User"),
+                            "guardianUid" to gUid,
+                            "guardianUsername" to oldGuardian,
+                            "status" to "accepted",
+                            "shareLocation" to true
+                        )
+                        db.collection("connections").add(connection)
+                        db.collection("users").document(user.uid).update("guardian", null)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun listenForGuardianRequests() {
+        val user = auth.currentUser ?: return
+        db.collection("connections")
+            .whereEqualTo("guardianUid", user.uid)
+            .whereEqualTo("status", "pending")
+            .addSnapshotListener { snapshots, _ ->
+                snapshots?.documentChanges?.forEach { doc ->
+                    if (doc.type == com.google.firebase.firestore.DocumentChange.Type.ADDED) {
+                        val pName = doc.document.getString("protectedUsername") ?: "Cineva"
+                        showRequestDialog(pName, doc.document.id)
+                    }
+                }
+            }
+    }
+
+    private fun showRequestDialog(name: String, connectionId: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Cerere Gardian")
+            .setMessage("$name vrea să îi fii gardian. Accepți?")
+            .setPositiveButton("Accept") { _, _ -> updateConnectionStatus(connectionId, "accepted") }
+            .setNegativeButton("Refuz") { _, _ -> updateConnectionStatus(connectionId, "rejected") }
+            .show()
+    }
+
+    private fun updateConnectionStatus(id: String, status: String) {
+        db.collection("connections").document(id).update("status", status)
+    }
+
     private fun listenForProtectedUsersLocations() {
         val currentUser = auth.currentUser ?: return
         connectionsListener = db.collection("connections")
             .whereEqualTo("guardianUid", currentUser.uid)
             .whereEqualTo("status", "accepted")
-            .addSnapshotListener { snapshots, e ->
-                if (e != null || snapshots == null) return@addSnapshotListener
+            .whereEqualTo("shareLocation", true)
+            .addSnapshotListener { snapshots, _ ->
+                if (snapshots == null) return@addSnapshotListener
                 
-                val currentSharedUids = mutableSetOf<String>()
-                for (doc in snapshots) {
-                    val shareEnabled = doc.getBoolean("shareLocation") ?: false
-                    val protectedUid = doc.getString("protectedUid") ?: continue
-                    
-                    if (shareEnabled) {
-                        currentSharedUids.add(protectedUid)
-                        if (!userLocationListeners.containsKey(protectedUid)) {
-                            startListeningToUserLocation(protectedUid)
-                        }
-                    }
-                }
-
-                val toRemove = userLocationListeners.keys.filter { !currentSharedUids.contains(it) }
-                toRemove.forEach { uid ->
+                val currentUids = snapshots.documents.mapNotNull { it.getString("protectedUid") }
+                
+                userLocationListeners.keys.filter { it !in currentUids }.forEach { uid ->
                     userLocationListeners[uid]?.remove()
                     userLocationListeners.remove(uid)
                     protectedMarkers[uid]?.let { map.overlays.remove(it) }
                     protectedMarkers.remove(uid)
-                    userBitmaps.remove(uid)
+                }
+
+                for (doc in snapshots.documents) {
+                    val pUid = doc.getString("protectedUid") ?: continue
+                    if (!userLocationListeners.containsKey(pUid)) {
+                        startListeningForUserLocation(pUid)
+                    }
                 }
                 map.invalidate()
             }
     }
 
-    private fun startListeningToUserLocation(uid: String) {
-        val listener = db.collection("users").document(uid)
-            .addSnapshotListener { snapshot, e ->
-                if (e != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
-                
-                val lat = snapshot.getDouble("latitude")
-                val lng = snapshot.getDouble("longitude")
-                val username = snapshot.getString("username") ?: "User"
-                val profileUrl = snapshot.getString("profileImageUrl")
-                val lastUpdate = snapshot.getTimestamp("lastLocationUpdate")
-
-                if (lat != null && lng != null) {
-                    updateProtectedUserMarker(uid, GeoPoint(lat, lng), username, profileUrl, lastUpdate)
+    private fun startListeningForUserLocation(uid: String) {
+        val listener = db.collection("users").document(uid).addSnapshotListener { doc, _ ->
+            if (doc != null && doc.exists()) {
+                val lat = doc.getDouble("latitude")
+                val lon = doc.getDouble("longitude")
+                val profileUrl = doc.getString("profileImageUrl")
+                if (lat != null && lon != null) {
+                    updateProtectedUserMarker(uid, GeoPoint(lat, lon), profileUrl)
                 }
             }
+        }
         userLocationListeners[uid] = listener
     }
 
-    private fun updateProtectedUserMarker(uid: String, point: GeoPoint, username: String, profileUrl: String?, lastUpdate: Timestamp?) {
-        userProfileUrls[uid] = profileUrl
-        var marker = protectedMarkers[uid]
-        if (marker == null) {
-            marker = Marker(map)
-            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            marker.setOnMarkerClickListener { _, _ ->
-                showUserBottomSheet(uid, username, lastUpdate)
-                true
+    private fun updateProtectedUserMarker(uid: String, point: GeoPoint, profileUrl: String?) {
+        val marker = protectedMarkers.getOrPut(uid) {
+            Marker(map).apply {
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                map.overlays.add(this)
             }
-            protectedMarkers[uid] = marker
-            map.overlays.add(marker)
         }
         marker.position = point
+        userProfileUrls[uid] = profileUrl
         
         if (!userBitmaps.containsKey(uid)) {
             loadMarkerIcon(uid, profileUrl)
@@ -397,16 +677,12 @@ class MainActivity : AppCompatActivity() {
         finalBitmap.applyCanvas {
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
             if (isEmergency) {
-                // Pulse circle (red matte/less transparent)
                 paint.color = Color.RED
                 paint.alpha = pulseAlpha
                 drawCircle(centerX, centerY, (size / 2f) + (margin / 2f), paint)
-                
-                // Inner red glow
                 paint.alpha = (pulseAlpha * 0.7).toInt()
                 drawCircle(centerX, centerY, (size / 2f) + 6, paint)
             } else {
-                // White circle background
                 paint.color = Color.WHITE
                 drawCircle(centerX, centerY, (size / 2f) + 4, paint)
             }
@@ -416,506 +692,22 @@ class MainActivity : AppCompatActivity() {
         marker.icon = finalBitmap.toDrawable(resources)
     }
 
-    private fun showUserBottomSheet(uid: String, username: String, lastUpdate: Timestamp?) {
-        val dialog = BottomSheetDialog(this)
-        val view = layoutInflater.inflate(R.layout.layout_user_bottom_sheet, drawerLayout, false)
-        
-        val tvName = view.findViewById<TextView>(R.id.bs_tv_username)
-        val tvUpdate = view.findViewById<TextView>(R.id.bs_tv_last_seen)
-        val btnSafe = view.findViewById<Button>(R.id.bs_btn_safe)
-        val btnClose = view.findViewById<Button>(R.id.bs_btn_close)
-
-        tvName.text = username
-        
-        if (lastUpdate != null) {
-            val now = System.currentTimeMillis()
-            val diff = now - lastUpdate.toDate().time
-            if (diff < 60000) { // Less than 1 minute
-                tvUpdate.text = getString(R.string.last_update_live)
-                tvUpdate.setTextColor(Color.parseColor("#4CAF50"))
-            } else {
-                val sdf = SimpleDateFormat("HH:mm, dd MMM", Locale.getDefault())
-                tvUpdate.text = getString(R.string.last_update_format, sdf.format(lastUpdate.toDate()))
-                tvUpdate.setTextColor(Color.GRAY)
-            }
-        } else {
-            tvUpdate.text = getString(R.string.location_unknown)
-        }
-
-        if (usersInEmergency.containsKey(uid)) {
-            btnSafe.visibility = View.VISIBLE
-            btnSafe.setOnClickListener {
-                usersInEmergency.remove(uid)
-                refreshMarkerIcon(uid)
-                map.invalidate()
-                dialog.dismiss()
-                Toast.makeText(this, "$username a fost marcat în siguranță", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        btnClose.setOnClickListener { dialog.dismiss() }
-        dialog.setContentView(view)
-        dialog.show()
+    override fun onResume() {
+        super.onResume()
+        map.onResume()
+        if (::locationOverlay.isInitialized) locationOverlay.enableMyLocation()
     }
 
-    private fun sendSosAlert() {
-        val currentUser = auth.currentUser ?: return
-        if (currentUser.isAnonymous) {
-            Toast.makeText(this, "Trebuie să fii logat pentru a trimite SOS!", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        db.collection("users").document(currentUser.uid).get().addOnSuccessListener { userDoc ->
-            val username = userDoc.getString("username") ?: "Cineva"
-            
-            db.collection("connections")
-                .whereEqualTo("protectedUid", currentUser.uid)
-                .whereEqualTo("status", "accepted")
-                .get()
-                .addOnSuccessListener { connections ->
-                    if (connections.isEmpty) {
-                        Toast.makeText(this, "Nu ai niciun gardian acceptat!", Toast.LENGTH_SHORT).show()
-                        return@addOnSuccessListener
-                    }
-
-                    for (doc in connections) {
-                        val guardianUid = doc.getString("guardianUid") ?: continue
-                        val alert = hashMapOf(
-                            "guardianUid" to guardianUid,
-                            "protectedUid" to currentUser.uid,
-                            "protectedUsername" to username,
-                            "message" to "$username are nevoie de ajutorul tau",
-                            "timestamp" to FieldValue.serverTimestamp(),
-                            "status" to "new"
-                        )
-                        db.collection("sos_alerts").add(alert)
-                    }
-                    Toast.makeText(this, "SOS trimis gardienilor!", Toast.LENGTH_LONG).show()
-                }
-        }
-    }
-
-    private fun listenForSosAlerts() {
-        val currentUser = auth.currentUser ?: return
-        db.collection("sos_alerts")
-            .whereEqualTo("guardianUid", currentUser.uid)
-            .whereEqualTo("status", "new")
-            .addSnapshotListener { snapshots, e ->
-                if (e != null || snapshots == null) return@addSnapshotListener
-                
-                for (doc in snapshots.documentChanges) {
-                    if (doc.type == com.google.firebase.firestore.DocumentChange.Type.ADDED) {
-                        val message = doc.document.getString("message") ?: "Cineva are nevoie de ajutor!"
-                        val alertId = doc.document.id
-                        val protectedUid = doc.document.getString("protectedUid") ?: ""
-                        val timestamp = doc.document.getTimestamp("timestamp")?.toDate()?.time ?: System.currentTimeMillis()
-                        
-                        val expiryTime = timestamp + (60 * 60 * 1000) // 1 hour
-                        
-                        if (System.currentTimeMillis() < expiryTime) {
-                            if (protectedUid.isNotEmpty()) {
-                                usersInEmergency[protectedUid] = expiryTime
-                                refreshMarkerIcon(protectedUid)
-                            }
-                        }
-                        
-                        showSosDialog(message, alertId)
-                    }
-                }
-            }
-    }
-
-    private fun showSosDialog(message: String, alertId: String) {
-        AlertDialog.Builder(this)
-            .setTitle("ALERTĂ SOS!")
-            .setMessage(message)
-            .setPositiveButton("Am înțeles") { _, _ ->
-                db.collection("sos_alerts").document(alertId).update("status", "read")
-            }
-            .setCancelable(false)
-            .show()
-    }
-
-    private fun showSignOutConfirmation() {
-        AlertDialog.Builder(this)
-            .setMessage("Ești sigur că dorești să ieși din cont?")
-            .setPositiveButton("Da") { _, _ ->
-                signOut()
-            }
-            .setNegativeButton("Nu", null)
-            .show()
-    }
-
-    private fun signOut() {
-        auth.signOut()
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
-    }
-
-    private fun listenForUserData() {
-        val uid = auth.currentUser?.uid ?: return
-        val ivMainProfile = findViewById<ImageView>(R.id.iv_main_profile)
-        val mainRankFrame = findViewById<View>(R.id.main_rank_frame)
-
-        db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
-            if (snapshot != null && snapshot.exists()) {
-                val profileUrl = snapshot.getString("profileImageUrl")
-                val trustFactor = snapshot.getLong("trustFactor")?.toInt() ?: 0
-                val rank = UserRank.fromTrustFactor(trustFactor)
-
-                if (mainRankFrame != null) applyRankFrame(mainRankFrame, rank)
-                if (!isFinishing && ivMainProfile != null) {
-                    Glide.with(this)
-                        .load(profileUrl ?: android.R.drawable.ic_menu_gallery)
-                        .circleCrop()
-                        .into(ivMainProfile)
-                }
-            }
-        }
-    }
-
-    private fun applyRankFrame(view: View, rank: UserRank) {
-        val gd = GradientDrawable()
-        gd.setColor(Color.TRANSPARENT)
-        gd.setStroke(6, rank.color)
-        gd.shape = GradientDrawable.OVAL
-        view.background = gd
-    }
-
-    private fun migrateOldGuardianData() {
-        val currentUser = auth.currentUser ?: return
-        db.collection("users").document(currentUser.uid).get().addOnSuccessListener { doc ->
-            if (doc.contains("guardianUid")) {
-                val gUid = doc.getString("guardianUid")
-                val gName = doc.getString("guardianUsername")
-                val status = doc.getString("guardianStatus")
-                val myName = doc.getString("username") ?: "User"
-
-                if (gUid != null) {
-                    val connection = hashMapOf(
-                        "protectedUid" to currentUser.uid,
-                        "protectedUsername" to myName,
-                        "guardianUid" to gUid,
-                        "guardianUsername" to gName,
-                        "status" to status
-                    )
-                    db.collection("connections").add(connection).addOnSuccessListener {
-                        db.collection("users").document(currentUser.uid).update(
-                            "guardianUid", FieldValue.delete(),
-                            "guardianUsername", FieldValue.delete(),
-                            "guardianStatus", FieldValue.delete()
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    private fun listenForGuardianRequests() {
-        val currentUser = auth.currentUser ?: return
-        db.collection("connections")
-            .whereEqualTo("guardianUid", currentUser.uid)
-            .whereEqualTo("status", "pending")
-            .addSnapshotListener { snapshots, e ->
-                if (e != null) return@addSnapshotListener
-                for (doc in snapshots!!) {
-                    val requesterUsername = doc.getString("protectedUsername") ?: "Cineva"
-                    val connectionId = doc.id
-                    showGuardianRequestDialog(requesterUsername, connectionId)
-                }
-            }
-    }
-
-    private fun showGuardianRequestDialog(username: String, connectionId: String) {
-        AlertDialog.Builder(this)
-            .setTitle("Cerere Gardian")
-            .setMessage("$username dorește să îi fii gardian. Ești de acord?")
-            .setPositiveButton("Accept") { _, _ -> updateConnectionStatus(connectionId, "accepted") }
-            .setNegativeButton("Refuz") { _, _ -> updateConnectionStatus(connectionId, "rejected") }
-            .setCancelable(false)
-            .show()
-    }
-
-    private fun updateConnectionStatus(connectionId: String, newStatus: String) {
-        db.collection("connections").document(connectionId)
-            .update("status", newStatus)
-            .addOnSuccessListener {
-                Toast.makeText(this, "Status actualizat: $newStatus", Toast.LENGTH_SHORT).show()
-            }
-    }
-
-    private fun setupNavigationHeader(navView: NavigationView) {
-        val headerView = navView.getHeaderView(0)
-        val tvUsername = headerView.findViewById<TextView>(R.id.tv_username)
-        val tvNavRank = headerView.findViewById<TextView>(R.id.tv_nav_rank)
-        val ivUserPhoto = headerView.findViewById<ImageView>(R.id.iv_user_photo)
-        val navRankFrame = headerView.findViewById<View>(R.id.nav_rank_frame)
-        
-        headerView.setOnClickListener {
-            startActivity(Intent(this, ProfileActivity::class.java))
-            drawerLayout.closeDrawer(GravityCompat.START)
-        }
-        
-        val currentUser = auth.currentUser
-        if (currentUser != null) {
-            if (currentUser.isAnonymous) {
-                tvUsername.text = getString(R.string.guest_user)
-                tvNavRank.text = ""
-            } else {
-                db.collection("users").document(currentUser.uid).addSnapshotListener { document, _ ->
-                    if (document != null && document.exists()) {
-                        val username = document.getString("username")
-                        val trustFactor = document.getLong("trustFactor")?.toInt() ?: 0
-                        val profileUrl = document.getString("profileImageUrl")
-                        val rank = UserRank.fromTrustFactor(trustFactor)
-
-                        tvUsername.text = username ?: "No Username"
-                        tvNavRank.text = rank.displayName
-                        tvNavRank.setTextColor(rank.color)
-                        applyRankFrame(navRankFrame, rank)
-
-                        if (!isFinishing) {
-                            Glide.with(this)
-                                .load(profileUrl ?: android.R.drawable.ic_menu_gallery)
-                                .circleCrop()
-                                .into(ivUserPhoto)
-                        }
-                    } else {
-                        tvUsername.text = currentUser.email
-                    }
-                }
-            }
-        }
-    }
-
-    private fun checkLocationPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            setupLocationOverlay()
-        } else {
-            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-    }
-
-    private fun setupLocationOverlay() {
-        locationOverlay = object : MyLocationNewOverlay(GpsMyLocationProvider(this), map) {
-            override fun onLocationChanged(location: android.location.Location?, source: IMyLocationProvider?) {
-                super.onLocationChanged(location, source)
-                location?.let {
-                    updateMyLocationInFirestore(it.latitude, it.longitude)
-                }
-            }
-        }
-        locationOverlay.enableMyLocation()
-        map.overlays.add(locationOverlay)
-        map.invalidate()
-    }
-
-    private fun updateMyLocationInFirestore(lat: Double, lng: Double) {
-        val uid = auth.currentUser?.uid ?: return
-        val updates = hashMapOf(
-            "latitude" to lat,
-            "longitude" to lng,
-            "lastLocationUpdate" to FieldValue.serverTimestamp()
-        )
-        db.collection("users").document(uid).update(updates as Map<String, Any>)
-    }
-
-    private fun listenForDangerZones() {
-        db.collection("reports").addSnapshotListener { snapshots, e ->
-            if (e != null) {
-                Log.w("Firestore", "Listen failed.", e)
-                return@addSnapshotListener
-            }
-            if (snapshots != null) {
-                dangerZoneOverlays.forEach { map.overlays.remove(it) }
-                dangerZoneOverlays.clear()
-                badZonesList.clear()
-                for (document in snapshots) {
-                    val lat = document.getDouble("lat") ?: 0.0
-                    val lng = document.getDouble("lng") ?: 0.0
-                    val radius = document.getDouble("radius") ?: 20.0
-                    val type = document.getString("type") ?: "Zona periculoasă"
-                    val zoneData = mapOf("lat" to lat, "lng" to lng, "radius" to radius, "type" to type)
-                    badZonesList.add(zoneData)
-                    addDangerZoneToMap(GeoPoint(lat, lng), radius, type, document.id)
-                }
-                map.invalidate()
-            }
-        }
-    }
-
-    private fun showReportDialog(point: GeoPoint) {
-        val dialogView = LayoutInflater.from(this).inflate(R.layout.raportari, null)
-        val spinner = dialogView.findViewById<Spinner>(R.id.spinner_issue_type)
-        val seekBar = dialogView.findViewById<SeekBar>(R.id.seekbar_radius)
-        val tvRadius = dialogView.findViewById<TextView>(R.id.tv_radius_label)
-        var currentRadius = 20.0
-        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val radius = if (progress < 5) 5 else progress
-                currentRadius = radius.toDouble()
-                tvRadius.text = getString(R.string.affected_area_format, radius)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-        AlertDialog.Builder(this).setView(dialogView).setPositiveButton("Report") { dialog, _ ->
-            val issueType = spinner.selectedItem.toString()
-            lifecycleScope.launch {
-                saveReportToDatabase(point, currentRadius, issueType)
-            }
-            dialog.dismiss()
-        }.setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }.create().show()
-    }
-
-    @Suppress("DEPRECATION")
-    private fun addDangerZoneToMap(center: GeoPoint, radius: Double, type: String, reportId: String) {
-        val circle = Polygon()
-        circle.points = Polygon.pointsAsCircle(center, radius)
-        val color = when {
-            type.startsWith("Zona periculoasă") -> Color.argb(100, 255, 0, 0) // Red
-            type.startsWith("Condiții meteorologice") -> Color.argb(100, 255, 165, 0) // Orange
-            type.startsWith("Drum nesigur") -> Color.argb(100, 0, 0, 0) // Black
-            else -> Color.argb(100, 255, 0, 0)
-        }
-        circle.fillColor = color
-        circle.strokeColor = color
-        circle.strokeWidth = 2.0f
-        circle.title = "$type (${radius.toInt()}m)"
-        
-        circle.setOnClickListener { _, _, _ ->
-            showConfirmDeleteDialog(reportId)
-            true
-        }
-
-        map.overlays.add(circle)
-        dangerZoneOverlays.add(circle)
-    }
-
-    private fun showConfirmDeleteDialog(reportId: String) {
-        val currentUser = auth.currentUser
-        if (currentUser == null || currentUser.isAnonymous) {
-            Toast.makeText(this, "You must be logged in to vote on reports.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        db.collection("users").document(currentUser.uid).get().addOnSuccessListener { userDoc ->
-            val userTrust = userDoc.getLong("trustFactor") ?: 0L
-            val voteWeight = if (userTrust < 2) 1L else userTrust / 2
-
-            AlertDialog.Builder(this)
-                .setTitle("Confirm Report")
-                .setMessage("Do you agree with this report?")
-                .setPositiveButton("Keep") { _, _ ->
-                    updateReportTrust(reportId, voteWeight)
-                }
-                .setNegativeButton("Remove") { _, _ ->
-                    updateReportTrust(reportId, -voteWeight)
-                }
-                .show()
-        }.addOnFailureListener {
-            Toast.makeText(this, "Error fetching user data", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun updateReportTrust(reportId: String, weight: Long) {
-        val currentUser = auth.currentUser ?: return
-        val reportRef = db.collection("reports").document(reportId)
-
-        reportRef.get().addOnSuccessListener { snapshot ->
-            val voters = snapshot.get("voters") as? List<*> ?: listOf<String>()
-            if (voters.contains(currentUser.uid)) {
-                Toast.makeText(this, "You have already voted on this report!", Toast.LENGTH_SHORT).show()
-                return@addOnSuccessListener
-            }
-
-            val creatorId = snapshot.getString("creatorId") ?: ""
-
-            val updates = hashMapOf(
-                "trust" to FieldValue.increment(weight),
-                "voters" to FieldValue.arrayUnion(currentUser.uid)
-            )
-
-            reportRef.update(updates as Map<String, Any>)
-                .addOnSuccessListener {
-                    if (creatorId.isNotEmpty() && creatorId != currentUser.uid) {
-                        db.collection("users").document(creatorId)
-                            .update("trustFactor", FieldValue.increment(weight))
-                    }
-
-                    reportRef.get().addOnSuccessListener { updatedSnapshot ->
-                        val currentTrust = updatedSnapshot.getLong("trust") ?: 0L
-                        if (currentTrust <= 0) {
-                            reportRef.delete()
-                            Toast.makeText(this, "Report removed.", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(this, "Vote registered!", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                }
-        }
-    }
-
-    private suspend fun getTrust(): String {
-        val currentUser = auth.currentUser ?: return "0"
-        if (currentUser.isAnonymous) return "0"
-
-        return try {
-            val document = db.collection("users").document(currentUser.uid).get().await()
-            val trustVal = document.getLong("trustFactor")?.toString()
-                ?: document.getString("trustFactor")
-                ?: "0"
-            trustVal
-        } catch (_: Exception) {
-            "0"
-        }
-    }
-
-    private suspend fun saveReportToDatabase(point: GeoPoint, radius: Double, type: String) {
-        val trustStr = getTrust()
-        val currentUser = auth.currentUser ?: return
-        val trustValue = trustStr.toLongOrNull() ?: 0L
-
-        val report = hashMapOf(
-            "lat" to point.latitude,
-            "lng" to point.longitude,
-            "radius" to radius,
-            "type" to type,
-            "timestamp" to Date(),
-            "trust" to trustValue,
-            "creatorId" to currentUser.uid,
-            "voters" to listOf(currentUser.uid)
-        )
-        db.collection("reports").add(report).addOnSuccessListener {
-            Toast.makeText(this, "Report Saved!", Toast.LENGTH_SHORT).show()
-            if (!currentUser.isAnonymous) {
-                db.collection("users").document(currentUser.uid)
-                    .update("trustFactor", FieldValue.increment(10))
-            }
-        }.addOnFailureListener { e ->
-            Toast.makeText(this, "Error saving: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    fun calculateSafeRoute(destination: GeoPoint) {
-        val myLocation = locationOverlay.myLocation
-        if (myLocation != null) {
-            Toast.makeText(this, "Calculating Safe Route...", Toast.LENGTH_SHORT).show()
-            routeManager.getSafeRoute(myLocation, destination, badZonesList)
-        } else {
-            Toast.makeText(this, "Waiting for GPS...", Toast.LENGTH_SHORT).show()
-        }
+    override fun onPause() {
+        super.onPause()
+        map.onPause()
+        if (::locationOverlay.isInitialized) locationOverlay.disableMyLocation()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        pulseHandler.removeCallbacks(pulseRunnable)
         connectionsListener?.remove()
         userLocationListeners.values.forEach { it.remove() }
-        pulseHandler.removeCallbacks(pulseRunnable)
     }
-
-    override fun onResume() { super.onResume() ; map.onResume() ; if (::locationOverlay.isInitialized) locationOverlay.enableMyLocation() }
-    override fun onPause() { super.onPause() ; map.onPause() ; if (::locationOverlay.isInitialized) locationOverlay.disableMyLocation() }
 }

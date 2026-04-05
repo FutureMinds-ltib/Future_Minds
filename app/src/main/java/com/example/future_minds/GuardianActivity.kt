@@ -95,7 +95,7 @@ class GuardianActivity : AppCompatActivity() {
         view.findViewById<TextView>(R.id.tv_item_status).text = "Status: $status"
         
         @SuppressLint("UseSwitchCompatOrMaterialCode")
-        val swShare = view.findViewById<Switch>(R.id.sw_share_location)
+        val swShare = view.findViewById<androidx.appcompat.widget.SwitchCompat>(R.id.sw_share_location)
         if (status == "accepted") {
             swShare.visibility = View.VISIBLE
             swShare.isChecked = shareLocation

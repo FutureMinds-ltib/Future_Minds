@@ -33,7 +33,11 @@
             <item
                 android:id="@+id/nav_report_bug"
                 android:icon="@android:drawable/ic_menu_send"
-                android:title="Raportează Bug" />
+                android:title="Raportează Bug Aplicație" />
+            <item
+                android:id="@+id/nav_report_city"
+                android:icon="@android:drawable/ic_menu_compass"
+                android:title="Raportează o problemă primăriei" />
             <item
                 android:id="@+id/nav_logout"
                 android:icon="@android:drawable/ic_lock_power_off"

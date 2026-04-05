@@ -5,7 +5,8 @@
     android:id="@+id/drawer_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="false"
+    android:background="@color/soft_blue_bg">
 
     <RelativeLayout
         android:layout_width="match_parent"
@@ -16,58 +17,133 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
+        <!-- Header Card: User Status -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/header_status_card"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:layout_margin="16dp"
+            android:layout_marginTop="40dp"
+            app:cardCornerRadius="40dp"
+            app:cardElevation="8dp">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingHorizontal="16dp">
+
+                <ImageButton
+                    android:id="@+id/btn_menu"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_centerVertical="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@android:drawable/ic_menu_sort_by_size"
+                    app:tint="@color/primary_blue" />
+
+                <FrameLayout
+                    android:id="@+id/btn_profile_container"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_centerVertical="true"
+                    android:layout_toEndOf="@id/btn_menu"
+                    android:layout_marginStart="8dp">
+
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_gravity="center"
+                        app:cardCornerRadius="24dp">
+                        <ImageView
+                            android:id="@+id/iv_main_profile"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@android:drawable/ic_menu_gallery" />
+                    </androidx.cardview.widget.CardView>
+                    <View
+                        android:id="@+id/main_rank_frame"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_toEndOf="@id/btn_profile_container"
+                    android:layout_marginStart="12dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_header_name"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Safeway"
+                        android:textColor="@color/primary_blue"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_header_rank"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@android:color/holo_green_light"
+                        android:paddingHorizontal="8dp"
+                        android:text="SAFETY HERO"
+                        android:textColor="@color/white"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Settings/Key button removed as requested -->
+
+            </RelativeLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Search & Favorites -->
         <LinearLayout
             android:id="@+id/search_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_alignParentTop="true"
-            android:layout_marginTop="48dp">
+            android:layout_below="@id/header_status_card"
+            android:orientation="vertical">
 
             <androidx.cardview.widget.CardView
                 android:id="@+id/search_card"
                 android:layout_width="match_parent"
                 android:layout_height="60dp"
                 android:layout_marginHorizontal="16dp"
-                app:cardCornerRadius="8dp"
-                app:cardElevation="8dp">
+                app:cardCornerRadius="30dp"
+                app:cardElevation="6dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:orientation="horizontal"
-                    android:padding="4dp">
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="20dp">
 
                     <ImageButton
-                        android:id="@+id/btn_menu"
+                        android:id="@+id/btn_search"
                         android:layout_width="48dp"
-                        android:layout_height="match_parent"
-                        android:src="@android:drawable/ic_menu_sort_by_size"
-                        android:background="?attr/selectableItemBackground"
-                        android:contentDescription="Menu" />
+                        android:layout_height="48dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@android:drawable/ic_menu_search"
+                        app:tint="@color/primary_blue" />
 
                     <AutoCompleteTextView
                         android:id="@+id/search_bar"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1"
-                        android:hint="Search for a place..."
-                        android:padding="12dp"
                         android:background="@null"
-                        android:inputType="textPostalAddress|textNoSuggestions"
+                        android:hint="Where are we going?"
                         android:imeOptions="actionSearch"
-                        android:singleLine="true"
-                        android:maxLines="1"
-                        android:dropDownHeight="wrap_content" />
+                        android:inputType="textPostalAddress"
+                        android:paddingHorizontal="12dp"
+                        android:singleLine="true" />
 
-                    <ImageButton
-                        android:id="@+id/btn_search"
-                        android:layout_width="48dp"
-                        android:layout_height="match_parent"
-                        android:src="@android:drawable/ic_menu_search"
-                        android:background="?attr/selectableItemBackground"
-                        android:contentDescription="Search" />
-
+                    <!-- Star button removed as requested -->
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
@@ -79,7 +155,6 @@
                 android:paddingHorizontal="16dp">
 
                 <LinearLayout
-                    android:id="@+id/ll_favorites"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
@@ -88,114 +163,103 @@
                         android:id="@+id/chip_home"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Acasă"
-                        app:chipIcon="@android:drawable/ic_menu_directions"
+                        android:text="Home"
+                        app:chipIcon="@android:drawable/ic_menu_myplaces"
+                        app:chipBackgroundColor="@color/home_blue"
+                        android:textColor="@color/white"
+                        app:chipIconTint="@color/white"
                         android:layout_marginEnd="8dp" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chip_work"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Muncă"
+                        android:text="School"
                         app:chipIcon="@android:drawable/ic_menu_directions"
+                        app:chipBackgroundColor="@color/school_green"
+                        android:textColor="@color/white"
+                        app:chipIconTint="@color/white"
                         android:layout_marginEnd="8dp" />
 
                     <com.google.android.material.chip.Chip
                         android:id="@+id/chip_school"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Școală"
-                        app:chipIcon="@android:drawable/ic_menu_directions" />
+                        android:text="Park"
+                        app:chipIcon="@android:drawable/ic_menu_compass"
+                        app:chipBackgroundColor="@color/park_lime"
+                        android:textColor="@color/text_dark"
+                        app:chipIconTint="@color/text_dark" />
                 </LinearLayout>
             </HorizontalScrollView>
         </LinearLayout>
 
-        <!-- Profile Button in the top right corner -->
-        <FrameLayout
-            android:id="@+id/btn_profile_container"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_alignParentTop="true"
-            android:layout_alignParentEnd="true"
-            android:layout_marginTop="160dp"
-            android:layout_marginEnd="16dp"
-            android:background="@android:color/transparent">
-
-            <androidx.cardview.widget.CardView
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="center"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="4dp">
-
-                <ImageView
-                    android:id="@+id/iv_main_profile"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:scaleType="centerCrop"
-                    android:src="@android:drawable/ic_menu_gallery" />
-            </androidx.cardview.widget.CardView>
-
-            <View
-                android:id="@+id/main_rank_frame"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@android:color/transparent" />
-        </FrameLayout>
-
-        <!-- Bottom Buttons Container to align them perfectly -->
+        <!-- Bottom Actions -->
         <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="110dp"
+            android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
-            android:layout_marginBottom="5dp">
+            android:padding="24dp">
 
-            <Button
-                android:id="@+id/button_route"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+            <ImageButton
+                android:id="@+id/button_report"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
                 android:layout_alignParentStart="true"
                 android:layout_centerVertical="true"
-                android:layout_marginStart="15dp"
-                android:text="Route" />
+                android:background="@drawable/bg_white_card"
+                android:elevation="4dp"
+                android:src="@android:drawable/ic_dialog_alert"
+                app:tint="@color/primary_blue" />
 
             <Button
                 android:id="@+id/button_sos"
-                android:layout_width="110dp"
-                android:layout_height="110dp"
+                android:layout_width="100dp"
+                android:layout_height="100dp"
                 android:layout_centerInParent="true"
                 android:background="@drawable/bg_sos_button"
-                app:backgroundTint="@null"
                 android:text="SOS"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/white"
+                android:textSize="20sp"
                 android:textStyle="bold"
-                android:textSize="28sp"
-                android:padding="0dp"
-                android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="none" />
+                app:backgroundTint="@null" />
 
-            <Button
-                android:id="@+id/button_report"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+            <ImageButton
+                android:id="@+id/button_route"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
                 android:layout_alignParentEnd="true"
                 android:layout_centerVertical="true"
-                android:layout_marginEnd="15dp"
-                android:text="Report" />
+                android:background="@drawable/bg_primary_button"
+                android:elevation="4dp"
+                android:src="@android:drawable/ic_menu_directions"
+                app:backgroundTint="@null"
+                app:tint="@color/white" />
+
+            <!-- Future Bus Button Placeholder -->
+            <ImageButton
+                android:id="@+id/btn_future_bus"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_above="@id/button_sos"
+                android:layout_centerHorizontal="true"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/bg_white_card"
+                android:src="@android:drawable/ic_dialog_map"
+                android:visibility="visible"
+                app:tint="@color/accent_blue" />
 
         </RelativeLayout>
 
-        <Switch
+        <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/testare"
             android:layout_width="wrap_content"
-            android:layout_height="38dp"
-            android:layout_alignParentTop="true"
+            android:layout_height="wrap_content"
             android:layout_alignParentEnd="true"
-            android:layout_marginTop="220dp"
-            android:layout_marginEnd="10dp"
-            android:text="Testare"
-            tools:ignore="UseSwitchCompatOrMaterialXml" />
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="16dp"
+            android:text="Test"
+            android:textColor="@color/text_dark" />
 
     </RelativeLayout>
 
@@ -204,8 +268,9 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
-        android:fitsSystemWindows="true"
         app:headerLayout="@layout/nav_header"
-        app:menu="@menu/drawer_menu" />
+        app:menu="@menu/drawer_menu"
+        app:itemIconTint="@color/primary_blue"
+        app:itemTextColor="@color/text_dark" />
 
 </androidx.drawerlayout.widget.DrawerLayout>

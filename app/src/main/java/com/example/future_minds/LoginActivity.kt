@@ -2,8 +2,10 @@ package com.example.future_minds
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -29,9 +31,9 @@ class LoginActivity : AppCompatActivity() {
         val etEmail = findViewById<EditText>(R.id.et_email)
         val etPassword = findViewById<EditText>(R.id.et_password)
         val btnLogin = findViewById<Button>(R.id.btn_login)
-        val btnRegister = findViewById<Button>(R.id.btn_register)
+        val btnRegister = findViewById<TextView>(R.id.btn_register) // Changed to TextView
         val btnGuest = findViewById<Button>(R.id.btn_guest)
-        val btnForgotPassword = findViewById<Button>(R.id.btn_forgot_password)
+        val btnForgotPassword = findViewById<TextView>(R.id.btn_forgot_password) // Changed to TextView
 
         btnGuest.setOnClickListener {
             auth.signInAnonymously()
@@ -55,11 +57,11 @@ class LoginActivity : AppCompatActivity() {
                     .addOnCompleteListener(this) { task ->
                         if (task.isSuccessful) {
                             val user = auth.currentUser
-                            if (user != null && user.isEmailVerified) {
+                            if (user != null && (user.isEmailVerified || user.isAnonymous)) {
                                 goToMapScreen()
                             } else {
                                 Toast.makeText(this, "Vă rugăm să vă verificați adresa de email!", Toast.LENGTH_LONG).show()
-                                auth.signOut() // Îl scoatem afară până confirmă email-ul
+                                auth.signOut()
                             }
                         } else {
                             Toast.makeText(this, "Login Failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()

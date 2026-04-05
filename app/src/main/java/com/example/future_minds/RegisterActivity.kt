@@ -3,6 +3,7 @@ package com.example.future_minds
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -20,12 +21,13 @@ class RegisterActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
         db = FirebaseFirestore.getInstance()
 
+        // In noul design, et_register_username este folosit pentru "Your Name"
         val etUsername = findViewById<EditText>(R.id.et_register_username)
         val etEmail = findViewById<EditText>(R.id.et_register_email)
         val etPassword = findViewById<EditText>(R.id.et_register_password)
         val etPhone = findViewById<EditText>(R.id.et_register_phone)
         val btnRegister = findViewById<Button>(R.id.btn_do_register)
-        val btnBack = findViewById<Button>(R.id.btn_back_to_login_from_reg)
+        val btnBack = findViewById<TextView>(R.id.btn_back_to_login_from_reg) // Changed to TextView in new design
 
         btnRegister.setOnClickListener {
             val username = etUsername.text.toString().trim()
@@ -44,7 +46,7 @@ class RegisterActivity : AppCompatActivity() {
                                 "username" to username,
                                 "email" to email,
                                 "phone" to phone,
-                                "phoneVerified" to false, // Set initially to false
+                                "phoneVerified" to false,
                                 "trustFactor" to trustFactor
                             )
 

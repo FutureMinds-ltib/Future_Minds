@@ -7,4 +7,10 @@
     <string name="next">Next</string>
     <string name="previous">Previous</string>
     <string name="trust_factor_label">TF: %1$d</string>
+
+    <string name="last_update_live">Ultima actualizare: live</string>
+    <string name="last_update_format">Ultima actualizare: %1$s</string>
+    <string name="location_unknown">Locație necunoscută</string>
+    <string name="guest_user">Guest User</string>
+    <string name="affected_area_format">Affected Area: %1$dm</string>
 </resources>

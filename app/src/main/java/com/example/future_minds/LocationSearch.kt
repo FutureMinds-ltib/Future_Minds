@@ -134,7 +134,7 @@ class LocationSearch(
         }
     }
 
-    private fun performSearch(query: String) {
+    fun performSearch(query: String) {
         if (query.isEmpty() || geocoder == null) return
 
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager

@@ -3,6 +3,7 @@ package com.example.future_minds
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -19,7 +20,7 @@ class ForgotPasswordActivity : AppCompatActivity() {
 
         val etEmail = findViewById<EditText>(R.id.et_reset_email)
         val btnSendReset = findViewById<Button>(R.id.btn_send_reset)
-        val btnBack = findViewById<Button>(R.id.btn_back_to_login)
+        val btnBack = findViewById<TextView>(R.id.btn_back_to_login) // Changed to TextView
 
         btnSendReset.setOnClickListener {
             val email = etEmail.text.toString().trim()

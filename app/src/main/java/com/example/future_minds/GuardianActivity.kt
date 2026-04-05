@@ -1,5 +1,6 @@
 package com.example.future_minds
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -26,7 +27,8 @@ class GuardianActivity : AppCompatActivity() {
         val etUsername = findViewById<EditText>(R.id.et_guardian_username)
         val etPhone = findViewById<EditText>(R.id.et_guardian_phone)
         val btnSave = findViewById<Button>(R.id.btn_save_guardian)
-        val btnBack = findViewById<Button>(R.id.btn_back_from_guardian)
+        // Fixed ClassCastException: btn_back_from_guardian is a TextView in XML
+        val btnBack = findViewById<View>(R.id.btn_back_from_guardian)
 
         loadMyGuardians()
 
@@ -92,6 +94,7 @@ class GuardianActivity : AppCompatActivity() {
         view.findViewById<TextView>(R.id.tv_item_username).text = name
         view.findViewById<TextView>(R.id.tv_item_status).text = "Status: $status"
         
+        @SuppressLint("UseSwitchCompatOrMaterialCode")
         val swShare = view.findViewById<Switch>(R.id.sw_share_location)
         if (status == "accepted") {
             swShare.visibility = View.VISIBLE

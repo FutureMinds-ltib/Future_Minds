@@ -6,17 +6,13 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.preference.PreferenceManager
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -24,6 +20,12 @@ import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.applyCanvas
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.toDrawable
+import androidx.core.graphics.scale
+import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
@@ -31,6 +33,8 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.chip.Chip
+import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
@@ -77,6 +81,9 @@ class MainActivity : AppCompatActivity() {
     private var pulseAlpha = 0
     private var pulseDirection = 20
 
+    private var isReportMode = false
+    private var isTestMode = false
+
     private val pulseRunnable = object : Runnable {
         override fun run() {
             if (usersInEmergency.isNotEmpty()) {
@@ -95,7 +102,7 @@ class MainActivity : AppCompatActivity() {
 
                 if (usersInEmergency.isNotEmpty()) {
                     pulseAlpha += pulseDirection
-                    if (pulseAlpha >= 220 || pulseAlpha <= 60) pulseDirection *= -1
+                    if (pulseAlpha !in 61..219) pulseDirection *= -1
                     
                     for (uid in usersInEmergency.keys) {
                         refreshMarkerIcon(uid)
@@ -121,7 +128,8 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("MissingInflatedId")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Configuration.getInstance().load(this, PreferenceManager.getDefaultSharedPreferences(this))
+        val sharedPrefs = getSharedPreferences("${packageName}_preferences", MODE_PRIVATE)
+        Configuration.getInstance().load(this, sharedPrefs)
         setContentView(R.layout.activity_main)
 
         auth = FirebaseAuth.getInstance()
@@ -148,9 +156,7 @@ class MainActivity : AppCompatActivity() {
                     startActivity(Intent(this, ProfileActivity::class.java))
                 }
                 R.id.nav_personal_data -> {
-                    Log.d("Navigation", "Opening PersonalDataActivity")
-                    val intent = Intent(this, PersonalDataActivity::class.java)
-                    startActivity(intent)
+                    startActivity(Intent(this, PersonalDataActivity::class.java))
                 }
                 R.id.nav_guardian -> {
                     startActivity(Intent(this, GuardianActivity::class.java))
@@ -177,15 +183,14 @@ class MainActivity : AppCompatActivity() {
         map.setTileSource(TileSourceFactory.MAPNIK)
         map.setMultiTouchControls(true)
 
-        var report_bool=false;
-        val report_btn= findViewById<Button>(R.id.button_report)
-        report_btn.setOnClickListener { report_bool=true }
+        val reportBtn = findViewById<ImageButton>(R.id.button_report)
+        reportBtn.setOnClickListener { isReportMode = true }
 
-        val route_btn= findViewById<Button>(R.id.button_route)
-        route_btn.setOnClickListener {
+        val routeBtn = findViewById<ImageButton>(R.id.button_route)
+        routeBtn.setOnClickListener {
             if(locationSearch.pntBool) {
                 calculateSafeRoute(locationSearch.pnt)
-            }else Toast.makeText(this, "You must first select a place", Toast.LENGTH_LONG).show()
+            } else Toast.makeText(this, "You must first select a place", Toast.LENGTH_LONG).show()
         }
 
         val sosBtn = findViewById<Button>(R.id.button_sos)
@@ -193,11 +198,10 @@ class MainActivity : AppCompatActivity() {
             sendSosAlert()
         }
 
-        val modTestare= findViewById<Switch>(R.id.testare)
-        var testare_bool=false
-        modTestare?.setOnCheckedChangeListener({ _ , isChecked ->
-            if (isChecked) testare_bool=true else testare_bool=false
-        })
+        val modTestare = findViewById<MaterialSwitch>(R.id.testare)
+        modTestare?.setOnCheckedChangeListener { _, isChecked ->
+            isTestMode = isChecked
+        }
 
         val mapController = map.controller
         mapController.setZoom(15.0)
@@ -209,14 +213,17 @@ class MainActivity : AppCompatActivity() {
         val searchButton = findViewById<ImageButton>(R.id.btn_search)
         locationSearch = LocationSearch(this, map, searchBar, searchButton)
 
+        // Setup Chips (Favorite shortcuts)
+        setupFavoriteChips()
+
         val mapEventsReceiver = object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean = false
             override fun longPressHelper(p: GeoPoint?): Boolean {
                 p?.let {
-                    if(testare_bool){
-                        if(report_bool){
+                    if(isTestMode){
+                        if(isReportMode){
                             showReportDialog(it)
-                            report_bool=false
+                            isReportMode = false
                         }else{
                             locationSearch.zoomToLocation(it,"Pin")
                         }
@@ -235,14 +242,54 @@ class MainActivity : AppCompatActivity() {
         pulseHandler.post(pulseRunnable)
     }
 
+    private fun setupFavoriteChips() {
+        val chipHome = findViewById<Chip>(R.id.chip_home)
+        val chipSchool = findViewById<Chip>(R.id.chip_work) 
+        val chipPark = findViewById<Chip>(R.id.chip_school) 
+
+        val uid = auth.currentUser?.uid ?: return
+        db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
+            if (snapshot != null && snapshot.exists()) {
+                val favorites = snapshot.get("favorites") as? Map<*, *>
+                
+                chipHome.setOnClickListener {
+                    val address = favorites?.get("home") as? String
+                    if (!address.isNullOrEmpty()) {
+                        locationSearch.performSearch(address)
+                    } else {
+                        Toast.makeText(this, "Adresa 'Home' nu este setată!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                
+                chipSchool.setOnClickListener {
+                    val address = favorites?.get("school") as? String
+                    if (!address.isNullOrEmpty()) {
+                        locationSearch.performSearch(address)
+                    } else {
+                        Toast.makeText(this, "Adresa 'School' nu este setată!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                
+                chipPark.setOnClickListener {
+                    val address = favorites?.get("park") as? String
+                    if (!address.isNullOrEmpty()) {
+                        locationSearch.performSearch(address)
+                    } else {
+                        Toast.makeText(this, "Adresa 'Park' nu este setată!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
     private fun reportBug() {
         val intent = Intent(Intent.ACTION_SENDTO).apply {
-            data = Uri.parse("mailto:safewayltib@gmail.com")
+            data = "mailto:safewayltib@gmail.com".toUri()
             putExtra(Intent.EXTRA_SUBJECT, "Raport Bug - Future Minds")
         }
         try {
             startActivity(intent)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Toast.makeText(this, "Nu s-a găsit nicio aplicație de email!", Toast.LENGTH_SHORT).show()
         }
     }
@@ -268,7 +315,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // Clean up listeners and markers for users no longer sharing
                 val toRemove = userLocationListeners.keys.filter { !currentSharedUids.contains(it) }
                 toRemove.forEach { uid ->
                     userLocationListeners[uid]?.remove()
@@ -315,21 +361,21 @@ class MainActivity : AppCompatActivity() {
         marker.position = point
         
         if (!userBitmaps.containsKey(uid)) {
-            loadMarkerIcon(uid, marker, profileUrl)
+            loadMarkerIcon(uid, profileUrl)
         } else {
             refreshMarkerIcon(uid)
         }
         map.invalidate()
     }
 
-    private fun loadMarkerIcon(uid: String, marker: Marker, url: String?) {
+    private fun loadMarkerIcon(uid: String, url: String?) {
         Glide.with(this)
             .asBitmap()
             .load(url ?: android.R.drawable.ic_menu_gallery)
             .circleCrop()
             .into(object : CustomTarget<Bitmap>() {
                 override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                    userBitmaps[uid] = Bitmap.createScaledBitmap(resource, 120, 120, false)
+                    userBitmaps[uid] = resource.scale(120, 120, false)
                     refreshMarkerIcon(uid)
                 }
                 override fun onLoadCleared(placeholder: Drawable?) {}
@@ -343,35 +389,36 @@ class MainActivity : AppCompatActivity() {
         
         val size = 120
         val margin = 24
-        val finalBitmap = Bitmap.createBitmap(size + margin, size + margin, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(finalBitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val finalBitmap = createBitmap(size + margin, size + margin, Bitmap.Config.ARGB_8888)
         
         val centerX = (size + margin) / 2f
         val centerY = (size + margin) / 2f
         
-        if (isEmergency) {
-            // Pulse circle (red matte/less transparent)
-            paint.color = Color.RED
-            paint.alpha = pulseAlpha
-            canvas.drawCircle(centerX, centerY, (size / 2f) + (margin / 2f), paint)
-            
-            // Inner red glow
-            paint.alpha = (pulseAlpha * 0.7).toInt()
-            canvas.drawCircle(centerX, centerY, (size / 2f) + 6, paint)
-        } else {
-            // White circle background
-            paint.color = Color.WHITE
-            canvas.drawCircle(centerX, centerY, (size / 2f) + 4, paint)
+        finalBitmap.applyCanvas {
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            if (isEmergency) {
+                // Pulse circle (red matte/less transparent)
+                paint.color = Color.RED
+                paint.alpha = pulseAlpha
+                drawCircle(centerX, centerY, (size / 2f) + (margin / 2f), paint)
+                
+                // Inner red glow
+                paint.alpha = (pulseAlpha * 0.7).toInt()
+                drawCircle(centerX, centerY, (size / 2f) + 6, paint)
+            } else {
+                // White circle background
+                paint.color = Color.WHITE
+                drawCircle(centerX, centerY, (size / 2f) + 4, paint)
+            }
+            drawBitmap(baseBitmap, (margin / 2).toFloat(), (margin / 2).toFloat(), null)
         }
         
-        canvas.drawBitmap(baseBitmap, (margin / 2).toFloat(), (margin / 2).toFloat(), null)
-        marker.icon = BitmapDrawable(resources, finalBitmap)
+        marker.icon = finalBitmap.toDrawable(resources)
     }
 
     private fun showUserBottomSheet(uid: String, username: String, lastUpdate: Timestamp?) {
         val dialog = BottomSheetDialog(this)
-        val view = layoutInflater.inflate(R.layout.layout_user_bottom_sheet, null)
+        val view = layoutInflater.inflate(R.layout.layout_user_bottom_sheet, drawerLayout, false)
         
         val tvName = view.findViewById<TextView>(R.id.bs_tv_username)
         val tvUpdate = view.findViewById<TextView>(R.id.bs_tv_last_seen)
@@ -384,15 +431,15 @@ class MainActivity : AppCompatActivity() {
             val now = System.currentTimeMillis()
             val diff = now - lastUpdate.toDate().time
             if (diff < 60000) { // Less than 1 minute
-                tvUpdate.text = "Ultima actualizare: live"
+                tvUpdate.text = getString(R.string.last_update_live)
                 tvUpdate.setTextColor(Color.parseColor("#4CAF50"))
             } else {
                 val sdf = SimpleDateFormat("HH:mm, dd MMM", Locale.getDefault())
-                tvUpdate.text = "Ultima actualizare: ${sdf.format(lastUpdate.toDate())}"
+                tvUpdate.text = getString(R.string.last_update_format, sdf.format(lastUpdate.toDate()))
                 tvUpdate.setTextColor(Color.GRAY)
             }
         } else {
-            tvUpdate.text = "Locație necunoscută"
+            tvUpdate.text = getString(R.string.location_unknown)
         }
 
         if (usersInEmergency.containsKey(uid)) {
@@ -614,7 +661,7 @@ class MainActivity : AppCompatActivity() {
         val currentUser = auth.currentUser
         if (currentUser != null) {
             if (currentUser.isAnonymous) {
-                tvUsername.text = "Guest User"
+                tvUsername.text = getString(R.string.guest_user)
                 tvNavRank.text = ""
             } else {
                 db.collection("users").document(currentUser.uid).addSnapshotListener { document, _ ->
@@ -709,7 +756,7 @@ class MainActivity : AppCompatActivity() {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 val radius = if (progress < 5) 5 else progress
                 currentRadius = radius.toDouble()
-                tvRadius.text = "Affected Area: ${radius}m"
+                tvRadius.text = getString(R.string.affected_area_format, radius)
             }
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
@@ -723,6 +770,7 @@ class MainActivity : AppCompatActivity() {
         }.setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }.create().show()
     }
 
+    @Suppress("DEPRECATION")
     private fun addDangerZoneToMap(center: GeoPoint, radius: Double, type: String, reportId: String) {
         val circle = Polygon()
         circle.points = Polygon.pointsAsCircle(center, radius)
@@ -777,7 +825,7 @@ class MainActivity : AppCompatActivity() {
         val reportRef = db.collection("reports").document(reportId)
 
         reportRef.get().addOnSuccessListener { snapshot ->
-            val voters = snapshot.get("voters") as? List<String> ?: listOf()
+            val voters = snapshot.get("voters") as? List<*> ?: listOf<String>()
             if (voters.contains(currentUser.uid)) {
                 Toast.makeText(this, "You have already voted on this report!", Toast.LENGTH_SHORT).show()
                 return@addOnSuccessListener
@@ -810,7 +858,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun getTrust_suspend(): String {
+    private suspend fun getTrust(): String {
         val currentUser = auth.currentUser ?: return "0"
         if (currentUser.isAnonymous) return "0"
 
@@ -820,13 +868,13 @@ class MainActivity : AppCompatActivity() {
                 ?: document.getString("trustFactor")
                 ?: "0"
             trustVal
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "0"
         }
     }
 
     private suspend fun saveReportToDatabase(point: GeoPoint, radius: Double, type: String) {
-        val trustStr = getTrust_suspend()
+        val trustStr = getTrust()
         val currentUser = auth.currentUser ?: return
         val trustValue = trustStr.toLongOrNull() ?: 0L
 
@@ -854,10 +902,10 @@ class MainActivity : AppCompatActivity() {
     fun calculateSafeRoute(destination: GeoPoint) {
         val myLocation = locationOverlay.myLocation
         if (myLocation != null) {
-            Toast.makeText(this, "Calculăm ruta sigură...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Calculating Safe Route...", Toast.LENGTH_SHORT).show()
             routeManager.getSafeRoute(myLocation, destination, badZonesList)
         } else {
-            Toast.makeText(this, "Așteptăm semnalul GPS...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Waiting for GPS...", Toast.LENGTH_SHORT).show()
         }
     }
 

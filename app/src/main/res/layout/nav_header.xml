@@ -1,29 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/design_default_color_primary"
-    android:gravity="bottom"
+    android:background="@color/soft_blue_bg"
+    android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:padding="16dp"
-    android:theme="@style/ThemeOverlay.AppCompat.Dark"
+    android:padding="24dp"
     android:fitsSystemWindows="true">
 
     <FrameLayout
-        android:layout_width="64dp"
-        android:layout_height="64dp">
+        android:layout_width="72dp"
+        android:layout_height="72dp">
 
-        <ImageView
-            android:id="@+id/iv_user_photo"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:src="@android:drawable/ic_menu_gallery"
-            android:padding="4dp" />
+        <androidx.cardview.widget.CardView
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_gravity="center"
+            app:cardCornerRadius="32dp"
+            app:cardElevation="4dp">
+            <ImageView
+                android:id="@+id/iv_user_photo"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@android:drawable/ic_menu_gallery" />
+        </androidx.cardview.widget.CardView>
 
         <View
             android:id="@+id/nav_rank_frame"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
             android:background="@android:color/transparent" />
     </FrameLayout>
 
@@ -31,23 +38,23 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
-        android:layout_gravity="center_vertical"
         android:orientation="vertical">
 
         <TextView
             android:id="@+id/tv_username"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Username"
-            android:textAppearance="@style/TextAppearance.AppCompat.Body1"
-            android:textSize="18sp"
+            android:text="Guest User"
+            android:textColor="@color/primary_blue"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tv_nav_rank"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Școlărel"
+            android:text="Novice Explorer"
+            android:textColor="@color/text_gray"
             android:textSize="14sp" />
     </LinearLayout>
 

@@ -2,6 +2,7 @@ package com.example.future_minds
 
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -21,7 +22,8 @@ class ProtectedActivity : AppCompatActivity() {
         db = FirebaseFirestore.getInstance()
 
         llProtectedList = findViewById(R.id.ll_protected_list)
-        val btnBack = findViewById<Button>(R.id.btn_back_from_protected)
+        // Fixed ClassCastException: btn_back_from_protected is a TextView in XML
+        val btnBack = findViewById<View>(R.id.btn_back_from_protected)
 
         loadProtectedUsers()
 
@@ -36,11 +38,11 @@ class ProtectedActivity : AppCompatActivity() {
             .whereEqualTo("guardianUid", currentUser.uid)
             .whereEqualTo("status", "accepted")
             .addSnapshotListener { snapshots, e ->
-                if (e != null) return@addSnapshotListener
+                if (e != null || snapshots == null) return@addSnapshotListener
                 
                 llProtectedList.removeAllViews()
                 
-                for (doc in snapshots!!) {
+                for (doc in snapshots) {
                     val pName = doc.getString("protectedUsername") ?: "Unknown"
                     val connectionId = doc.id
                     

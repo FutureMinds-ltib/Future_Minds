@@ -2,4 +2,19 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- New Cartoonish Design Colors -->
+    <color name="primary_blue">#005CA9</color>
+    <color name="accent_blue">#3498DB</color>
+    <color name="soft_blue_bg">#F0F7FF</color>
+    <color name="safety_green">#8BC34A</color>
+    <color name="sos_red">#C62828</color>
+    <color name="text_dark">#2C3E50</color>
+    <color name="text_gray">#7F8C8D</color>
+    <color name="input_bg">#F4F7FE</color>
+    <color name="card_bg">#FFFFFF</color>
+
+    <color name="home_blue">#1976D2</color>
+    <color name="school_green">#388E3C</color>
+    <color name="park_lime">#AEEA00</color>
 </resources>

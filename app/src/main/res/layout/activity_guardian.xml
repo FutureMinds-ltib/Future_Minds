@@ -1,76 +1,115 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:fitsSystemWindows="true">
+    android:background="@color/white"
+    android:fillViewport="true">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:padding="24dp">
 
         <TextView
+            android:id="@+id/tv_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
             android:text="Gardienii Tăi"
-            android:textSize="24sp"
+            android:textColor="@color/text_dark"
+            android:textSize="26sp"
             android:textStyle="bold"
-            android:layout_gravity="center"
-            android:layout_marginBottom="16dp"/>
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-        <!-- Lista de gardieni existenti -->
+        <!-- Existing Guardians List -->
         <LinearLayout
             android:id="@+id/ll_guardians_list"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
             android:orientation="vertical"
-            android:layout_marginBottom="24dp" />
+            app:layout_constraintTop_toBottomOf="@id/tv_title" />
 
-        <View
+        <androidx.cardview.widget.CardView
+            android:id="@+id/add_guardian_card"
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#DDDDDD"
-            android:layout_marginBottom="24dp" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            app:cardBackgroundColor="@color/soft_blue_bg"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="0dp"
+            app:layout_constraintTop_toBottomOf="@id/ll_guardians_list">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Adaugă un gardian nou"
+                    android:textColor="@color/primary_blue"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/et_guardian_username"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_rounded_input"
+                    android:drawableStart="@android:drawable/ic_menu_edit"
+                    android:drawablePadding="12dp"
+                    android:hint="Username Gardian"
+                    android:inputType="textPersonName"
+                    android:paddingHorizontal="20dp" />
+
+                <EditText
+                    android:id="@+id/et_guardian_phone"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_rounded_input"
+                    android:drawableStart="@android:drawable/ic_menu_call"
+                    android:drawablePadding="12dp"
+                    android:hint="Număr de Telefon"
+                    android:inputType="phone"
+                    android:paddingHorizontal="20dp" />
+
+                <Button
+                    android:id="@+id/btn_save_guardian"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:layout_marginTop="20dp"
+                    android:background="@drawable/bg_primary_button"
+                    android:text="Trimite Cerere"
+                    android:textAllCaps="false"
+                    android:textColor="@color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="@null" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
         <TextView
+            android:id="@+id/btn_back_from_guardian"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Adaugă un gardian nou"
-            android:textSize="16sp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="24dp"
+            android:text="← Înapoi"
+            android:textColor="@color/text_gray"
             android:textStyle="bold"
-            android:layout_marginBottom="16dp"/>
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/add_guardian_card" />
 
-        <EditText
-            android:id="@+id/et_guardian_username"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Username Gardian"
-            android:inputType="textPersonName"
-            android:layout_marginBottom="16dp"/>
-
-        <EditText
-            android:id="@+id/et_guardian_phone"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Număr de Telefon"
-            android:inputType="phone"
-            android:layout_marginBottom="24dp"/>
-
-        <Button
-            android:id="@+id/btn_save_guardian"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Trimite Cerere" />
-
-        <Button
-            android:id="@+id/btn_back_from_guardian"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Înapoi" />
-
-    </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>

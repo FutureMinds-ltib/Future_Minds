@@ -1,6 +1,7 @@
 package com.example.future_minds
 
 import android.app.AlertDialog
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.*
@@ -38,10 +39,19 @@ class PersonalDataActivity : AppCompatActivity() {
         tvPhoneStatusText = findViewById(R.id.tv_phone_status_text)
         btnVerifyPhone = findViewById(R.id.btn_verify_phone)
 
-        findViewById<Button>(R.id.btn_pd_back).setOnClickListener { finish() }
+        // Fixed ClassCastException: btn_pd_back is a TextView in XML
+        findViewById<View>(R.id.btn_pd_back).setOnClickListener { finish() }
 
         btnVerifyPhone.setOnClickListener {
             startPhoneNumberVerification()
+        }
+
+        // Add navigation to Guardians and Protected
+        findViewById<Button>(R.id.btn_nav_guardians).setOnClickListener {
+            startActivity(Intent(this, GuardianActivity::class.java))
+        }
+        findViewById<Button>(R.id.btn_nav_protected).setOnClickListener {
+            startActivity(Intent(this, ProtectedActivity::class.java))
         }
 
         loadUserData()

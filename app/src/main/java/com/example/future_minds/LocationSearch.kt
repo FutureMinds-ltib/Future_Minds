@@ -29,8 +29,9 @@ class LocationSearch(
 ) {
 
     private var geocoder: Geocoder? = null
-    lateinit var pnt: GeoPoint
-    public  var pntBool: Boolean=false
+    public lateinit var pnt: GeoPoint
+    public var pntBool: Boolean = false
+
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private var currentMarker: Marker? = null
@@ -188,4 +189,6 @@ class LocationSearch(
             override fun publishResults(c: CharSequence?, r: FilterResults?) { if (r?.count ?: 0 > 0) notifyDataSetChanged() else notifyDataSetInvalidated() }
         }
     }
+
+
 }

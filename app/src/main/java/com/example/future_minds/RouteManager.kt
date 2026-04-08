@@ -58,14 +58,38 @@ class RouteManager(private val context: Context, private val map: MapView) {
         }
     }
 
-    private fun clearRoutes() {
-        safeRouteOverlay?.let { map.overlays.remove(it) }
-        fastRouteOverlay?.let { map.overlays.remove(it) }
-        busRouteOverlay?.let { map.overlays.remove(it) }
-        safeRouteOverlay = null
-        fastRouteOverlay = null
-        busRouteOverlay = null
-        map.invalidate()
+    fun clearRoutes() {
+        // Safety check to ensure we are on the Main UI Thread
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            Handler(Looper.getMainLooper()).post { clearRoutes() }
+            return
+        }
+
+        try {
+            safeRouteOverlay = null
+            fastRouteOverlay = null
+            busRouteOverlay = null // Added this line
+
+// IMPROVED CLEARING: Loop through and keep the Destination pin
+            val overlaysToRemove = mutableListOf<org.osmdroid.views.overlay.Overlay>()
+            for (overlay in map.overlays) {
+                if (overlay is Polyline) {
+                    overlaysToRemove.add(overlay)
+                }
+                if (overlay is org.osmdroid.views.overlay.Marker) {
+                    // Only remove markers that are identified as bus stops
+                    // This ensures the Destination pin is never removed
+                    if (overlay.id == "BUS_STOP") {
+                        overlaysToRemove.add(overlay)
+                    }
+                }
+            }
+            map.overlays.removeAll(overlaysToRemove)
+
+            map.invalidate() // Redraw the map
+        } catch (e: Exception) {
+            Log.e("RouteManager", "Error clearing routes safely: ${e.message}")
+        }
     }
 
     private fun fetchRoute(start: GeoPoint, end: GeoPoint, badZones: List<Map<String, Any>>, isSafeAttempt: Boolean) {
@@ -128,35 +152,10 @@ class RouteManager(private val context: Context, private val map: MapView) {
         })
     }
     private fun fetchOTPBusRoute(start: GeoPoint, destination: GeoPoint, badZones: List<Map<String, Any>>) {
-        val allBannedPolygons = StringBuilder()
-        for (zone in badZones) {
-            val lat = (zone["lat"] as? Number)?.toDouble() ?: continue
-            val lon = (zone["lon"] as? Number)?.toDouble() ?: continue
-            // For Buses, the radius needs to be substantial to block the whole road
-            val radius = 250.0
-
-            val latDeg = radius / 111320.0
-            val lngDeg = radius / (111320.0 * cos(Math.toRadians(lat)))
-
-            if (allBannedPolygons.isNotEmpty()) allBannedPolygons.append(";")
-
-            val polygonBuilder = StringBuilder("POLYGON((")
-            for (i in 0..8) {
-                val angle = Math.toRadians(i * 45.0)
-                val pLat = lat + latDeg * sin(angle)
-                val pLon = lon + lngDeg * cos(angle)
-                // standard: longitude <space> latitude
-                polygonBuilder.append(String.format(Locale.US, "%.6f %.6f", pLon, pLat))
-                if (i < 8) polygonBuilder.append(",")
-            }
-            polygonBuilder.append("))")
-            allBannedPolygons.append(polygonBuilder.toString())
-        }
-
         val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(java.util.Date())
         val sdfTime = java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(java.util.Date())
 
-        val otpUrl = "http://192.168.1.138:8080/otp/routers/default/plan"
+        val otpUrl = "http://tawanda-sequestral-tasha.ngrok-free.dev/otp/routers/default/plan"
         val urlBuilder = otpUrl.toHttpUrlOrNull()!!.newBuilder()
             .addQueryParameter("fromPlace", "${start.latitude},${start.longitude}")
             .addQueryParameter("toPlace", "${destination.latitude},${destination.longitude}")
@@ -165,18 +164,8 @@ class RouteManager(private val context: Context, private val map: MapView) {
             .addQueryParameter("time", sdfTime)
             .addQueryParameter("maxWalkDistance", "2000")
             .addQueryParameter("arriveBy", "false")
-            // walkReluctance makes walking through banned areas very "expensive" for the algorithm
             .addQueryParameter("walkReluctance", "2000")
             .addQueryParameter("waitReluctance", "0.01")
-            .addQueryParameter("bannedRouteReluctance", "100000")
-
-        if (allBannedPolygons.isNotEmpty()) {
-            val bannedString = allBannedPolygons.toString()
-            // Try both common parameter names to ensure compatibility with your OTP version
-            urlBuilder.addQueryParameter("bannedAreas", bannedString)
-            // Some older versions of OTP use this for transit specific blocking
-            urlBuilder.addQueryParameter("unpreferredAreas", bannedString)
-        }
 
         val request = Request.Builder().url(urlBuilder.build()).build()
         client.newCall(request).enqueue(object : Callback {
@@ -184,17 +173,128 @@ class RouteManager(private val context: Context, private val map: MapView) {
             override fun onResponse(call: Call, response: Response) {
                 val responseData = response.body?.string()
                 if (responseData != null) {
-                    val fakeGeoJson = convertOtpToGeoJson(responseData)
                     Handler(Looper.getMainLooper()).post {
-                        if (fakeGeoJson.isNotEmpty()) {
-                            processAndDrawRoute(fakeGeoJson, true)
-                        } else {
-                            showToast("No bus found that can avoid these areas.")
-                        }
+                        processAndDrawBusRoute(responseData, start, destination, badZones)
                     }
                 }
             }
         })
+    }
+
+    private fun createStationIcon(): android.graphics.drawable.BitmapDrawable {
+        val size = 40
+        val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+
+        // Draw Black Outline
+        paint.color = Color.BLACK
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+
+        // Draw White Inner Circle
+        paint.color = Color.WHITE
+        canvas.drawCircle(size / 2f, size / 2f, (size / 2f) - 3, paint)
+
+        return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
+    }
+    private fun processAndDrawBusRoute(otpResponse: String, start: GeoPoint, end: GeoPoint, badZones: List<Map<String, Any>>) {
+        try {
+            val json = JSONObject(otpResponse)
+            val plan = json.optJSONObject("plan") ?: return
+            val itineraries = plan.optJSONArray("itineraries") ?: return
+            if (itineraries.length() == 0) return
+
+            val itinerary = itineraries.getJSONObject(0)
+            val legs = itinerary.getJSONArray("legs")
+
+            var hasTransit = false
+            for (i in 0 until legs.length()) {
+                if (legs.getJSONObject(i).getString("mode") != "WALK") {
+                    hasTransit = true
+                    break
+                }
+            }
+
+            if (!hasTransit) {
+                showToast("No bus available. Calculating safe walking routes...")
+                // Clear current overlays
+                //clearRoutes()
+
+                // Trigger the standard ORS walking logic (Fast and Safe)
+                fetchRoute(start, end, emptyList(), isSafeAttempt = false)
+                if (badZones.isNotEmpty()) {
+                    fetchRoute(start, end, badZones, isSafeAttempt = true)
+                }
+                return // Exit this function so we don't draw the OTP walk leg
+            }
+
+            clearRoutes()
+            val stationIcon = createStationIcon()
+
+            for (i in 0 until legs.length()) {
+                val leg = legs.getJSONObject(i)
+                val mode = leg.getString("mode")
+                val points = decodePolyline(leg.getJSONObject("legGeometry").getString("points"))
+                if (points.isEmpty()) continue
+
+                val polyline = Polyline(map)
+                polyline.setPoints(points)
+
+                if (mode == "WALK") {
+                    polyline.outlinePaint.color = Color.GRAY
+                    polyline.outlinePaint.strokeWidth = 12f
+                    polyline.title = "Walk"
+                } else {
+                    val busName = leg.optString("routeShortName", "Bus")
+                    val headsign = leg.optString("headsign", "")
+
+                    polyline.outlinePaint.color = Color.BLUE
+                    polyline.outlinePaint.strokeWidth = 14f
+                    polyline.title = "$busName"
+
+                    // --- NEW: DRAW ALL STOPS IN THIS LEG ---
+                    val allStopsInLeg = mutableListOf<JSONObject>()
+
+                    // 1. Add Departure Stop
+                    allStopsInLeg.add(leg.getJSONObject("from"))
+
+                    // 2. Add Intermediate Stops (all the stops the bus hits in between)
+                    val intermediateStops = leg.optJSONArray("intermediateStops")
+                    if (intermediateStops != null) {
+                        for (j in 0 until intermediateStops.length()) {
+                            allStopsInLeg.add(intermediateStops.getJSONObject(j))
+                        }
+                    }
+
+                    // 3. Add Arrival Stop
+                    allStopsInLeg.add(leg.getJSONObject("to"))
+
+                    // Now create markers for every stop collected
+                    for (stopJson in allStopsInLeg) {
+                        val stopMarker = org.osmdroid.views.overlay.Marker(map)
+                        stopMarker.id = "BUS_STOP" // Identification for clearRoutes
+                        stopMarker.position = GeoPoint(stopJson.getDouble("lat"), stopJson.getDouble("lon"))
+                        stopMarker.setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
+                        stopMarker.icon = stationIcon
+                        stopMarker.title = "Stop: " + stopJson.optString("name", "Bus Stop")
+                        stopMarker.infoWindow = null // Keep it simple, info is on the line
+                        map.overlays.add(stopMarker)
+                    }
+                }
+
+                // Show InfoWindow on line click
+                polyline.setOnClickListener { poly, mapView, eventPos ->
+                    poly.showInfoWindow()
+                    true
+                }
+
+                map.overlays.add(polyline)
+            }
+
+            map.invalidate()
+        } catch (e: Exception) {
+            Log.e("RouteManager", "Error drawing bus route: ${e.message}")
+        }
     }
 
     private fun convertOtpToGeoJson(otpResponse: String): String {
@@ -311,28 +411,21 @@ class RouteManager(private val context: Context, private val map: MapView) {
             val polyline = Polyline(map)
             polyline.setPoints(points)
 
-            if (isBusModeActive) {
-                busRouteOverlay?.let { map.overlays.remove(it) }
-                polyline.outlinePaint.color = Color.BLUE
+            if (isSafe) {
+                safeRouteOverlay?.let { map.overlays.remove(it) }
+                polyline.outlinePaint.color = "#4CAF50".toColorInt()
                 polyline.outlinePaint.strokeWidth = 14f
-                polyline.title = "Bus Route: ${formatTime(duration)}"
-                busRouteOverlay = polyline
+                polyline.title = "Safe Route: ${formatTime(duration)}"
+                safeRouteOverlay = polyline
             } else {
-                if (isSafe) {
-                    safeRouteOverlay?.let { map.overlays.remove(it) }
-                    polyline.outlinePaint.color = "#4CAF50".toColorInt()
-                    polyline.outlinePaint.strokeWidth = 14f
-                    polyline.title = "Safe Route: ${formatTime(duration)}"
-                    safeRouteOverlay = polyline
-                } else {
-                    fastRouteOverlay?.let { map.overlays.remove(it) }
-                    polyline.outlinePaint.color = "#F44336".toColorInt()
-                    polyline.outlinePaint.strokeWidth = 10f
-                    polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(20f, 20f), 0f)
-                    polyline.title = "Fastest Route: ${formatTime(duration)}"
-                    fastRouteOverlay = polyline
-                }
+                fastRouteOverlay?.let { map.overlays.remove(it) }
+                polyline.outlinePaint.color = "#F44336".toColorInt()
+                polyline.outlinePaint.strokeWidth = 10f
+                polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(20f, 20f), 0f)
+                polyline.title = "Fastest Route: ${formatTime(duration)}"
+                fastRouteOverlay = polyline
             }
+
 
             map.overlays.add(polyline)
             map.invalidate()

@@ -185,6 +185,33 @@ class MainActivity : AppCompatActivity() {
         locationSearch = LocationSearch(this, map, searchBar, searchBtn)
         routeManager = RouteManager(this, map)
 
+        val routeBtn = findViewById<ImageButton>(R.id.button_route)
+        routeBtn.setOnClickListener {
+            if(!locationSearch.pntBool) {
+                Toast.makeText(this, "No location selected", Toast.LENGTH_SHORT).show()
+            }
+            calculateSafeRoute(locationSearch.pnt)
+        }
+
+        val btnFutureBus = findViewById<ImageButton>(R.id.btn_future_bus)
+        var isBusEnabled = false
+
+        btnFutureBus.setOnClickListener {
+            isBusEnabled = !isBusEnabled
+
+            // Update UI to show state
+            if (isBusEnabled) {
+                btnFutureBus.setColorFilter(ContextCompat.getColor(this, R.color.primary_blue))
+                Toast.makeText(this, "Bus routing enabled", Toast.LENGTH_SHORT).show()
+            } else {
+                btnFutureBus.setColorFilter(ContextCompat.getColor(this, R.color.accent_blue))
+                Toast.makeText(this, "Walking routing enabled", Toast.LENGTH_SHORT).show()
+            }
+
+            // Tell RouteManager which mode to use
+            routeManager.isBusModeActive=isBusEnabled
+        }
+
         setupFavoriteChips()
 
         val mapEventsReceiver = object : MapEventsReceiver {

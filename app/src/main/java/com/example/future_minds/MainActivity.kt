@@ -373,13 +373,18 @@ class MainActivity : AppCompatActivity() {
                     val lon = doc.getDouble("lon") ?: 0.0
                     val radius = doc.getDouble("radius") ?: 100.0
                     val type = doc.getString("type") ?: "warning"
-                    
+                    val docId = doc.id
+
                     badZonesList.add(mapOf("lat" to lat, "lon" to lon, "radius" to radius))
                     
                     val circle = Polygon()
                     circle.points = Polygon.pointsAsCircle(GeoPoint(lat, lon), radius)
                     circle.fillPaint.color = if (type == "danger") Color.argb(80, 255, 0, 0) else Color.argb(80, 255, 165, 0)
                     circle.outlinePaint.color = Color.TRANSPARENT
+                    circle.setOnClickListener { polygon, mapView, eventPos ->
+                        showDeleteZoneDialog(docId, type)
+                        true // consume the event
+                    }
                     map.overlays.add(circle)
                     dangerZoneOverlays.add(circle)
                 }
@@ -387,47 +392,156 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    private fun showDeleteZoneDialog(documentId: String, type: String) {
+        val uid = auth.currentUser?.uid ?: return
 
-    private fun showReportDialog(point: GeoPoint) {
-        val dialog = BottomSheetDialog(this)
-        val view = layoutInflater.inflate(R.layout.raportari, findViewById(android.R.id.content), false)
-        
-        val spinner = view.findViewById<Spinner>(R.id.spinner_issue_type)
-        val seekBar = view.findViewById<SeekBar>(R.id.seekbar_radius)
-        val tvRadius = view.findViewById<TextView>(R.id.tv_radius_label)
-        
-        seekBar?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                tvRadius?.text = getString(R.string.affected_area_format, progress)
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
+        db.collection("users").document(uid).get().addOnSuccessListener { userSnapshot ->
+            val myTrust = userSnapshot?.getLong("trustFactor")?.toInt() ?: 0
 
-        val btnSubmit = Button(this).apply { text = getString(R.string.submit_report) }
-        (view as? LinearLayout)?.addView(btnSubmit)
+            // Fetch the zone details
+            db.collection("danger_zones").document(documentId).get().addOnSuccessListener { zoneSnapshot ->
+                if (!zoneSnapshot.exists()) return@addOnSuccessListener
 
-        btnSubmit.setOnClickListener {
-            val type = spinner?.selectedItem?.toString() ?: "warning"
-            val radius = seekBar?.progress?.toDouble() ?: 20.0
-            
-            val report = hashMapOf(
-                "lat" to point.latitude,
-                "lon" to point.longitude,
-                "description" to type,
-                "type" to if (type.contains("pericol", ignoreCase = true) || type.contains("danger", ignoreCase = true)) "danger" else "warning",
-                "radius" to radius,
-                "timestamp" to FieldValue.serverTimestamp(),
-                "reportedBy" to auth.currentUser?.uid
-            )
-            db.collection("danger_zones").add(report).addOnSuccessListener {
-                Toast.makeText(this, "Raport trimis! Mulțumim.", Toast.LENGTH_SHORT).show()
-                dialog.dismiss()
+                val votedBy = zoneSnapshot.get("votedBy") as? List<String> ?: listOf()
+                val votedAgainst = zoneSnapshot.get("votedAgainst") as? List<String> ?: listOf()
+
+                // --- 1. PREVENT DOUBLE VOTING ---
+                if (votedBy.contains(uid)) {
+                    Toast.makeText(this, "Ai votat deja pentru această zonă!", Toast.LENGTH_SHORT).show()
+                    return@addOnSuccessListener
+                }
+                if (votedAgainst.contains(uid)) {
+                    Toast.makeText(this, "Ai votat deja pentru această zonă!", Toast.LENGTH_SHORT).show()
+                    return@addOnSuccessListener
+                }
+
+                AlertDialog.Builder(this)
+                    .setTitle("Gestionare Zonă")
+                    .setMessage("Confirmi prezența acestui pericol sau dorești să îl contești?")
+                    .setPositiveButton("Elimină") { _, _ ->
+                        handleVote(documentId, uid, myTrust, isConfirming = false)
+                    }
+                    .setNegativeButton("Confirmă") { _, _ ->
+                        handleVote(documentId, uid, myTrust, isConfirming = true)
+                    }
+                    .setNeutralButton("Anulează", null)
+                    .show()
             }
         }
+    }
 
-        dialog.setContentView(view)
-        dialog.show()
+    private fun handleVote(documentId: String, voterUid: String, voterTrust: Int, isConfirming: Boolean) {
+        val zoneRef = db.collection("danger_zones").document(documentId)
+
+        zoneRef.get().addOnSuccessListener { snapshot ->
+            if (!snapshot.exists()) return@addOnSuccessListener
+
+            var currentTrust = snapshot.getLong("trust")?.toInt() ?: 0
+            val creatorUid = snapshot.getString("reportedBy") ?: ""
+            val votedBy = snapshot.get("votedBy") as? MutableList<String> ?: mutableListOf()
+            val votedAgainst = snapshot.get("votedAgainst") as? MutableList<String> ?: mutableListOf()
+
+            // Add current user to the list of voters
+
+            if (isConfirming) {
+                votedBy.forEach { uid -> updateUserTrust(uid, +20) }
+                votedAgainst.forEach { uid -> updateUserTrust(uid, -20) }
+                votedBy.add(voterUid)
+                // INCREASE trust of the zone
+                currentTrust += (voterTrust / 2).coerceAtLeast(1)
+                zoneRef.update("trust", currentTrust, "votedBy", votedBy, "votedAgainst", votedAgainst).addOnSuccessListener {
+                    Toast.makeText(this, "Zona a fost confirmată!", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                // DECREASE trust of the zone
+                currentTrust -= (voterTrust / 2).coerceAtLeast(1)
+                votedBy.forEach { uid -> updateUserTrust(uid, -20) }
+                votedAgainst.forEach { uid -> updateUserTrust(uid, +20) }
+
+                votedAgainst.add(voterUid)
+
+                if (currentTrust <= 0) {
+                    zoneRef.delete().addOnSuccessListener {
+                        Toast.makeText(this, "Zona a fost eliminată. Scoruri actualizate.", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    zoneRef.update("trust", currentTrust, "votedBy", votedBy, "votedAgainst", votedAgainst).addOnSuccessListener {
+                        Toast.makeText(this, "Încrederea zonei a scăzut.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    // Helper to update trust factor of a specific user
+    private fun updateUserTrust(userUid: String, amount: Int) {
+        if (userUid.isEmpty()) return
+        val userRef = db.collection("users").document(userUid)
+        db.runTransaction { transaction ->
+            val snapshot = transaction.get(userRef)
+            val oldTrust = snapshot.getLong("trustFactor") ?: 0
+            transaction.update(userRef, "trustFactor", oldTrust + amount)
+        }.addOnFailureListener {
+            // Handle error (e.g. user doesn't exist)
+        }
+    }
+
+    private fun showReportDialog(point: GeoPoint) {
+        val uid = auth.currentUser?.uid ?: return
+        db.collection("users").document(uid).get().addOnSuccessListener { snapshot ->
+            val reporters:MutableList<String> = mutableListOf()
+            reporters.add(uid)
+            val trust = snapshot?.getLong("trustFactor")?.toInt() ?: 0
+            val dialog = BottomSheetDialog(this)
+            val view = layoutInflater.inflate(
+                R.layout.raportari,
+                findViewById(android.R.id.content),
+                false
+            )
+
+            val spinner = view.findViewById<Spinner>(R.id.spinner_issue_type)
+            val seekBar = view.findViewById<SeekBar>(R.id.seekbar_radius)
+            val tvRadius = view.findViewById<TextView>(R.id.tv_radius_label)
+
+            seekBar?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(
+                    seekBar: SeekBar?,
+                    progress: Int,
+                    fromUser: Boolean
+                ) {
+                    tvRadius?.text = getString(R.string.affected_area_format, progress)
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            })
+
+            val btnSubmit = Button(this).apply { text = getString(R.string.submit_report) }
+            (view as? LinearLayout)?.addView(btnSubmit)
+
+            btnSubmit.setOnClickListener {
+                val type = spinner?.selectedItem?.toString() ?: "warning"
+                val radius = seekBar?.progress?.toDouble() ?: 20.0
+
+                val report = hashMapOf(
+                    "lat" to point.latitude,
+                    "lon" to point.longitude,
+                    "description" to type,
+                    "type" to if (type.contains("pericol", ignoreCase = true) || type.contains("danger", ignoreCase = true)) "danger" else "warning",
+                    "radius" to radius,
+                    "timestamp" to FieldValue.serverTimestamp(),
+                    "votedBy" to reporters,
+                    "trust" to trust
+                )
+                db.collection("danger_zones").add(report).addOnSuccessListener {
+                    Toast.makeText(this, "Raport trimis! Mulțumim.", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                }
+            }
+
+            dialog.setContentView(view)
+            dialog.show()
+        }
     }
 
     private fun sendSosAlert() {

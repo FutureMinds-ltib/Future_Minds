@@ -1,16 +1,13 @@
 package com.example.future_minds
 
 import android.content.Context
-import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.core.graphics.toColorInt
-import androidx.navigation.activity
 import okhttp3.*
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
@@ -27,12 +24,10 @@ class RouteManager(private val context: Context, private val map: MapView) {
     private val client = OkHttpClient()
     private val apiKey = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjFhYzIyMDdmMDlhMjRjZmM4YmYwZjVhMDIxNzg2OWJmIiwiaCI6Im11cm11cjY0In0="
     
+    var isBusModeActive: Boolean = false
+    
     private var safeRouteOverlay: Polyline? = null
     private var fastRouteOverlay: Polyline? = null
-    private var busRouteOverlay: Polyline? = null
-    public var isBusModeActive = false
-
-
 
     fun getSafeRoute(start: GeoPoint, end: GeoPoint, badZones: List<Map<String, Any>>) {
         // Clear previous routes
@@ -44,52 +39,21 @@ class RouteManager(private val context: Context, private val map: MapView) {
             return
         }
 
-        if (isBusModeActive) {
-            // In Bus mode, we only make one call
-            fetchOTPBusRoute(start, end, badZones)
-        } else {
-            // 1. Fetch the Fast (Risky) Route
-            fetchRoute(start, end, emptyList(), isSafeAttempt = false)
+        // 1. Fetch the Fast (Risky) Route
+        fetchRoute(start, end, emptyList(), isSafeAttempt = false)
 
-            // 2. Fetch the Safe Route (only if there are zones to avoid)
-            if (badZones.isNotEmpty()) {
-                fetchRoute(start, end, badZones, isSafeAttempt = true)
-            }
+        // 2. Fetch the Safe Route (only if there are zones to avoid)
+        if (badZones.isNotEmpty()) {
+            fetchRoute(start, end, badZones, isSafeAttempt = true)
         }
     }
 
-    fun clearRoutes() {
-        // Safety check to ensure we are on the Main UI Thread
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            Handler(Looper.getMainLooper()).post { clearRoutes() }
-            return
-        }
-
-        try {
-            safeRouteOverlay = null
-            fastRouteOverlay = null
-            busRouteOverlay = null // Added this line
-
-// IMPROVED CLEARING: Loop through and keep the Destination pin
-            val overlaysToRemove = mutableListOf<org.osmdroid.views.overlay.Overlay>()
-            for (overlay in map.overlays) {
-                if (overlay is Polyline) {
-                    overlaysToRemove.add(overlay)
-                }
-                if (overlay is org.osmdroid.views.overlay.Marker) {
-                    // Only remove markers that are identified as bus stops
-                    // This ensures the Destination pin is never removed
-                    if (overlay.id == "BUS_STOP") {
-                        overlaysToRemove.add(overlay)
-                    }
-                }
-            }
-            map.overlays.removeAll(overlaysToRemove)
-
-            map.invalidate() // Redraw the map
-        } catch (e: Exception) {
-            Log.e("RouteManager", "Error clearing routes safely: ${e.message}")
-        }
+    private fun clearRoutes() {
+        safeRouteOverlay?.let { map.overlays.remove(it) }
+        fastRouteOverlay?.let { map.overlays.remove(it) }
+        safeRouteOverlay = null
+        fastRouteOverlay = null
+        map.invalidate()
     }
 
     private fun fetchRoute(start: GeoPoint, end: GeoPoint, badZones: List<Map<String, Any>>, isSafeAttempt: Boolean) {
@@ -107,21 +71,14 @@ class RouteManager(private val context: Context, private val map: MapView) {
                 val multiPolygonCoordinates = JSONArray()
                 for (zone in badZones) {
                     val lat = (zone["lat"] as? Number)?.toDouble() ?: continue
-                    // FIX: Changed "lng" to "lon" to match your data structure
-                    val lon = (zone["lon"] as? Number)?.toDouble() ?: continue
+                    val lng = (zone["lon"] as? Number)?.toDouble() ?: continue
                     val radius = (zone["radius"] as? Number)?.toDouble() ?: 20.0
-
                     val latDeg = radius / 111320.0
                     val lngDeg = radius / (111320.0 * cos(Math.toRadians(lat)))
                     val ring = JSONArray()
-
-                    // FIX: Loop 0..8 (9 points) ensures the polygon is closed for the API
                     for (i in 0..8) {
                         val angle = Math.toRadians(i * 45.0)
-                        ring.put(JSONArray()
-                            .put(lon + lngDeg * cos(angle))
-                            .put(lat + latDeg * sin(angle))
-                        )
+                        ring.put(JSONArray().put(lng + lngDeg * cos(angle)).put(lat + latDeg * sin(angle)))
                     }
                     multiPolygonCoordinates.put(JSONArray().put(ring))
                 }
@@ -131,276 +88,96 @@ class RouteManager(private val context: Context, private val map: MapView) {
             jsonBody.put("options", options)
         }
 
+        val profile = if (isBusModeActive) "driving-car" else "foot-walking"
         val body = jsonBody.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
         val request = Request.Builder()
-            .url("https://api.openrouteservice.org/v2/directions/foot-walking/geojson")
+            .url("https://api.openrouteservice.org/v2/directions/$profile/geojson")
             .post(body).addHeader("Authorization", apiKey).build()
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                Handler(Looper.getMainLooper()).post { showToast("Network error") }
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(context, "Network error: Check your internet connection.", Toast.LENGTH_SHORT).show()
+                }
             }
 
             override fun onResponse(call: Call, response: Response) {
-                val responseData = response.body?.string()
-                if (response.isSuccessful && responseData != null) {
-                    Handler(Looper.getMainLooper()).post {
-                        processAndDrawRoute(responseData, isSafeAttempt)
-                    }
-                }
-            }
-        })
-    }
-    private fun fetchOTPBusRoute(start: GeoPoint, destination: GeoPoint, badZones: List<Map<String, Any>>) {
-        val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(java.util.Date())
-        val sdfTime = java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(java.util.Date())
-
-        val otpUrl = "http://tawanda-sequestral-tasha.ngrok-free.dev/otp/routers/default/plan"
-        val urlBuilder = otpUrl.toHttpUrlOrNull()!!.newBuilder()
-            .addQueryParameter("fromPlace", "${start.latitude},${start.longitude}")
-            .addQueryParameter("toPlace", "${destination.latitude},${destination.longitude}")
-            .addQueryParameter("mode", "TRANSIT,WALK")
-            .addQueryParameter("date", sdfDate)
-            .addQueryParameter("time", sdfTime)
-            .addQueryParameter("maxWalkDistance", "2000")
-            .addQueryParameter("arriveBy", "false")
-            .addQueryParameter("walkReluctance", "2000")
-            .addQueryParameter("waitReluctance", "0.01")
-
-        val request = Request.Builder().url(urlBuilder.build()).build()
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) { Log.e("OTP", "Request Failed", e) }
-            override fun onResponse(call: Call, response: Response) {
-                val responseData = response.body?.string()
-                if (responseData != null) {
-                    Handler(Looper.getMainLooper()).post {
-                        processAndDrawBusRoute(responseData, start, destination, badZones)
-                    }
-                }
-            }
-        })
-    }
-
-    private fun createStationIcon(): android.graphics.drawable.BitmapDrawable {
-        val size = 40
-        val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
-        val canvas = android.graphics.Canvas(bitmap)
-        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-
-        // Draw Black Outline
-        paint.color = Color.BLACK
-        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
-
-        // Draw White Inner Circle
-        paint.color = Color.WHITE
-        canvas.drawCircle(size / 2f, size / 2f, (size / 2f) - 3, paint)
-
-        return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
-    }
-    private fun processAndDrawBusRoute(otpResponse: String, start: GeoPoint, end: GeoPoint, badZones: List<Map<String, Any>>) {
-        try {
-            val json = JSONObject(otpResponse)
-            val plan = json.optJSONObject("plan") ?: return
-            val itineraries = plan.optJSONArray("itineraries") ?: return
-            if (itineraries.length() == 0) return
-
-            val itinerary = itineraries.getJSONObject(0)
-            val legs = itinerary.getJSONArray("legs")
-
-            var hasTransit = false
-            for (i in 0 until legs.length()) {
-                if (legs.getJSONObject(i).getString("mode") != "WALK") {
-                    hasTransit = true
-                    break
-                }
-            }
-
-            if (!hasTransit) {
-                showToast("No bus available. Calculating safe walking routes...")
-                // Clear current overlays
-                //clearRoutes()
-
-                // Trigger the standard ORS walking logic (Fast and Safe)
-                fetchRoute(start, end, emptyList(), isSafeAttempt = false)
-                if (badZones.isNotEmpty()) {
-                    fetchRoute(start, end, badZones, isSafeAttempt = true)
-                }
-                return // Exit this function so we don't draw the OTP walk leg
-            }
-
-            clearRoutes()
-            val stationIcon = createStationIcon()
-
-            for (i in 0 until legs.length()) {
-                val leg = legs.getJSONObject(i)
-                val mode = leg.getString("mode")
-                val points = decodePolyline(leg.getJSONObject("legGeometry").getString("points"))
-                if (points.isEmpty()) continue
-
-                val polyline = Polyline(map)
-                polyline.setPoints(points)
-
-                if (mode == "WALK") {
-                    polyline.outlinePaint.color = Color.GRAY
-                    polyline.outlinePaint.strokeWidth = 12f
-                    polyline.title = "Walk"
-                } else {
-                    val busName = leg.optString("routeShortName", "Bus")
-                    val headsign = leg.optString("headsign", "")
-
-                    polyline.outlinePaint.color = Color.BLUE
-                    polyline.outlinePaint.strokeWidth = 14f
-                    polyline.title = "$busName"
-
-                    // --- NEW: DRAW ALL STOPS IN THIS LEG ---
-                    val allStopsInLeg = mutableListOf<JSONObject>()
-
-                    // 1. Add Departure Stop
-                    allStopsInLeg.add(leg.getJSONObject("from"))
-
-                    // 2. Add Intermediate Stops (all the stops the bus hits in between)
-                    val intermediateStops = leg.optJSONArray("intermediateStops")
-                    if (intermediateStops != null) {
-                        for (j in 0 until intermediateStops.length()) {
-                            allStopsInLeg.add(intermediateStops.getJSONObject(j))
+                if (response.isSuccessful) {
+                    val responseData = response.body?.string()
+                    if (responseData != null) {
+                        Handler(Looper.getMainLooper()).post {
+                            processAndDrawRoute(responseData,isSafeAttempt)
                         }
                     }
+                } else {
+                    val errorCode = response.code
+                    val errorBody = response.body?.string()
+                    android.util.Log.e("RouteManager", "API Error $errorCode: $errorBody")
 
-                    // 3. Add Arrival Stop
-                    allStopsInLeg.add(leg.getJSONObject("to"))
+                    // Handle specific API limits and errors safely on the Main Thread
+                    Handler(Looper.getMainLooper()).post {
+                        var specificErrorMessage: String? = null
+                        if (errorBody != null) {
+                            try {
+                                val jsonError = org.json.JSONObject(errorBody)
+                                val errorObj = jsonError.optJSONObject("error")
+                                if (errorObj != null) {
+                                    val internalCode = errorObj.optInt("code")
+                                    val internalMessage = errorObj.optString("message", "")
 
-                    // Now create markers for every stop collected
-                    for (stopJson in allStopsInLeg) {
-                        val stopMarker = org.osmdroid.views.overlay.Marker(map)
-                        stopMarker.id = "BUS_STOP" // Identification for clearRoutes
-                        stopMarker.position = GeoPoint(stopJson.getDouble("lat"), stopJson.getDouble("lon"))
-                        stopMarker.setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
-                        stopMarker.icon = stationIcon
-                        stopMarker.title = "Stop: " + stopJson.optString("name", "Bus Stop")
-                        stopMarker.infoWindow = null // Keep it simple, info is on the line
-                        map.overlays.add(stopMarker)
+                                    // 2. Catch our specific profile bug
+                                    if (internalCode == 2003 && internalMessage.contains("profile")) {
+                                        specificErrorMessage = "The routing server is temporarily down. Please try again later."
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                // If it's not valid JSON, just ignore and fall back to HTTP codes
+                                e.printStackTrace()
+                            }
+                        }
+                        if (specificErrorMessage != null) {
+                            Toast.makeText(context, specificErrorMessage, Toast.LENGTH_LONG).show()
+                        } else {
+                            when (errorCode) {
+                                429 -> Toast.makeText(
+                                    context,
+                                    "Server is busy (Too many requests). Try again in a minute!",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                400 -> Toast.makeText(
+                                    context,
+                                    "Route too long or impossible to calculate with current danger zones.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                404 -> Toast.makeText(
+                                    context,
+                                    "Could not find a valid walking route to that exact location.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                else -> Toast.makeText(
+                                    context,
+                                    "Routing failed (Error $errorCode).",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
                     }
                 }
-
-                // Show InfoWindow on line click
-                polyline.setOnClickListener { poly, mapView, eventPos ->
-                    poly.showInfoWindow()
-                    true
-                }
-
-                map.overlays.add(polyline)
             }
-
-            map.invalidate()
-        } catch (e: Exception) {
-            Log.e("RouteManager", "Error drawing bus route: ${e.message}")
-        }
-    }
-
-    private fun convertOtpToGeoJson(otpResponse: String): String {
-        try {
-            val otpJson = JSONObject(otpResponse)
-            if (otpJson.has("error")) return ""
-
-            val plan = otpJson.optJSONObject("plan") ?: return ""
-            val itineraries = plan.optJSONArray("itineraries") ?: return ""
-            if (itineraries.length() == 0) return ""
-
-            val itinerary = itineraries.getJSONObject(0)
-            val duration = itinerary.getDouble("duration")
-            val legs = itinerary.getJSONArray("legs")
-
-            var hasTransit = false
-            val allCoordinates = JSONArray()
-
-            for (i in 0 until legs.length()) {
-                val leg = legs.getJSONObject(i)
-                if (leg.getString("mode") != "WALK") hasTransit = true
-
-                // FIX: You MUST decode the polyline string into GeoPoints
-                val encodedPoints = leg.getJSONObject("legGeometry").getString("points")
-                val decodedPoints = decodePolyline(encodedPoints)
-
-                // Add decoded points to our GeoJSON array
-                for (point in decodedPoints) {
-                    val coord = JSONArray()
-                    coord.put(point.longitude)
-                    coord.put(point.latitude)
-                    allCoordinates.put(coord)
-                }
-            }
-
-            if (!hasTransit) {
-                showToast("Bus not available. Showing walking route.")
-            }
-
-            // Build the GeoJSON structure that processAndDrawRoute expects
-            val feature = JSONObject()
-            val geometry = JSONObject()
-            geometry.put("type", "LineString")
-            geometry.put("coordinates", allCoordinates)
-
-            val properties = JSONObject()
-            val summary = JSONObject()
-            summary.put("duration", duration)
-            properties.put("summary", summary)
-
-            feature.put("type", "Feature")
-            feature.put("geometry", geometry)
-            feature.put("properties", properties)
-
-            val featureCollection = JSONObject()
-            featureCollection.put("type", "FeatureCollection")
-            featureCollection.put("features", JSONArray().put(feature))
-
-            return featureCollection.toString()
-        } catch (e: Exception) {
-            Log.e("RouteManager", "OTP Conversion Error: ${e.message}")
-            return ""
-        }
-    }
-
-    // Helper to decode Google Polyline (common in OTP responses)
-    private fun decodePolyline(encoded: String): List<GeoPoint> {
-        val poly = ArrayList<GeoPoint>()
-        var index = 0
-        val len = encoded.length
-        var lat = 0
-        var lng = 0
-        while (index < len) {
-            var b: Int
-            var shift = 0
-            var result = 0
-            do {
-                b = encoded[index++].code - 63
-                result = result or (b and 0x1f shl shift)
-                shift += 5
-            } while (b >= 0x20)
-            val dlat = if (result and 1 != 0) (result shr 1).inv() else result shr 1
-            lat += dlat
-            shift = 0
-            result = 0
-            do {
-                b = encoded[index++].code - 63
-                result = result or (b and 0x1f shl shift)
-                shift += 5
-            } while (b >= 0x20)
-            val dlng = if (result and 1 != 0) (result shr 1).inv() else result shr 1
-            lng += dlng
-            poly.add(GeoPoint(lat.toDouble() / 1E5, lng.toDouble() / 1E5))
-        }
-        return poly
+        })
     }
 
     private fun processAndDrawRoute(jsonString: String, isSafe: Boolean) {
         try {
-            if (jsonString.isEmpty()) return
-
             val feature = JSONObject(jsonString).getJSONArray("features").getJSONObject(0)
             val geometry = feature.getJSONObject("geometry")
             val coords = geometry.getJSONArray("coordinates")
             val properties = feature.getJSONObject("properties").getJSONObject("summary")
-            val duration = properties.getDouble("duration")
+            
+            val duration = properties.getDouble("duration") // in seconds
 
             val points = ArrayList<GeoPoint>()
             for (i in 0 until coords.length()) {
@@ -410,32 +187,28 @@ class RouteManager(private val context: Context, private val map: MapView) {
 
             val polyline = Polyline(map)
             polyline.setPoints(points)
-
+            
             if (isSafe) {
-                safeRouteOverlay?.let { map.overlays.remove(it) }
-                polyline.outlinePaint.color = "#4CAF50".toColorInt()
+                polyline.outlinePaint.color = "#4CAF50".toColorInt() // Green for Safe
                 polyline.outlinePaint.strokeWidth = 14f
                 polyline.title = "Safe Route: ${formatTime(duration)}"
                 safeRouteOverlay = polyline
             } else {
-                fastRouteOverlay?.let { map.overlays.remove(it) }
-                polyline.outlinePaint.color = "#F44336".toColorInt()
+                polyline.outlinePaint.color = "#F44336".toColorInt() // Red for Fast/Risky
                 polyline.outlinePaint.strokeWidth = 10f
+                // Make the risky route dashed
                 polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(20f, 20f), 0f)
                 polyline.title = "Fastest Route: ${formatTime(duration)}"
                 fastRouteOverlay = polyline
             }
 
-
             map.overlays.add(polyline)
             map.invalidate()
 
-            if (!isBusModeActive) {
-                checkIfBothRoutesReady()
-            }
-        } catch (e: Exception) {
-            Log.e("RouteManager", "Error drawing route", e)
-        }
+            // Optional: Comparison message
+            checkIfBothRoutesReady()
+
+        } catch (e: Exception) { Log.e("RouteManager", "Error parsing route", e) }
     }
 
     private fun checkIfBothRoutesReady() {

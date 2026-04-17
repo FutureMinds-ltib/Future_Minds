@@ -175,7 +175,7 @@ class LocationSearch(
             this.title = title
             showInfoWindow()
         }
-        map.overlays.add(1, currentMarker)
+        map.overlays.add(currentMarker)
         map.invalidate()
     }
 

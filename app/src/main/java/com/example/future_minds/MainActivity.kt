@@ -82,7 +82,6 @@ class MainActivity : AppCompatActivity() {
     private var pulseDirection = 20
 
     private var isReportMode = false
-    private var isTestMode = false
 
     private val pulseRunnable = object : Runnable {
         override fun run() {
@@ -90,11 +89,11 @@ class MainActivity : AppCompatActivity() {
                 pulseAlpha += pulseDirection
                 if (pulseAlpha <= 60 || pulseAlpha >= 220) pulseDirection *= -1
                 
+                // Optimized: Only refresh if needed, and map.invalidate() once
                 usersInEmergency.keys.forEach { uid -> refreshMarkerIcon(uid) }
-                map.invalidate()
+                map.postInvalidate()
             }
-            // Lag reduction: 500ms instead of 100ms
-            pulseHandler.postDelayed(this, 500)
+            pulseHandler.postDelayed(this, 300) 
         }
     }
 
@@ -162,6 +161,7 @@ class MainActivity : AppCompatActivity() {
         map = findViewById(R.id.map)
         map.setTileSource(TileSourceFactory.MAPNIK)
         map.setMultiTouchControls(true)
+        map.setBuiltInZoomControls(false)
         map.controller.setZoom(15.0)
         map.controller.setCenter(GeoPoint(44.4268, 26.1025))
 
@@ -169,12 +169,6 @@ class MainActivity : AppCompatActivity() {
         reportBtn?.setOnClickListener { 
             isReportMode = true 
             Toast.makeText(this, "Apasă lung pe hartă pentru a raporta!", Toast.LENGTH_SHORT).show()
-        }
-
-        val testBtn = findViewById<MaterialSwitch>(R.id.testare)
-        testBtn?.setOnCheckedChangeListener { _, isChecked ->
-            isTestMode = isChecked
-            Toast.makeText(this, if (isTestMode) "Test Mode ON" else "Test Mode OFF", Toast.LENGTH_SHORT).show()
         }
 
         val sosBtn = findViewById<Button>(R.id.button_sos)
@@ -186,31 +180,15 @@ class MainActivity : AppCompatActivity() {
         routeManager = RouteManager(this, map)
 
         val routeBtn = findViewById<ImageButton>(R.id.button_route)
-        routeBtn.setOnClickListener {
+        routeBtn?.setOnClickListener {
             if(!locationSearch.pntBool) {
                 Toast.makeText(this, "No location selected", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
             calculateSafeRoute(locationSearch.pnt)
         }
 
-        val btnFutureBus = findViewById<ImageButton>(R.id.btn_future_bus)
-        var isBusEnabled = false
-
-        btnFutureBus.setOnClickListener {
-            isBusEnabled = !isBusEnabled
-
-            // Update UI to show state
-            if (isBusEnabled) {
-                btnFutureBus.setColorFilter(ContextCompat.getColor(this, R.color.primary_blue))
-                Toast.makeText(this, "Bus routing enabled", Toast.LENGTH_SHORT).show()
-            } else {
-                btnFutureBus.setColorFilter(ContextCompat.getColor(this, R.color.accent_blue))
-                Toast.makeText(this, "Walking routing enabled", Toast.LENGTH_SHORT).show()
-            }
-
-            // Tell RouteManager which mode to use
-            routeManager.isBusModeActive=isBusEnabled
-        }
+        setupTransportToggle()
 
         setupFavoriteChips()
 
@@ -221,8 +199,8 @@ class MainActivity : AppCompatActivity() {
                     if(isReportMode){
                         showReportDialog(it)
                         isReportMode = false
-                    } else if (isTestMode) {
-                        locationSearch.zoomToLocation(it, "Pin")
+                    } else {
+                        locationSearch.zoomToLocation(it, "Punct selectat")
                     }
                 }
                 return true
@@ -235,6 +213,47 @@ class MainActivity : AppCompatActivity() {
         listenForUserData()
         
         pulseHandler.post(pulseRunnable)
+    }
+
+    private fun setupTransportToggle() {
+        val btnWalking = findViewById<View>(R.id.btn_toggle_walking)
+        val btnBus = findViewById<View>(R.id.btn_toggle_bus)
+        
+        val ivWalking = findViewById<ImageView>(R.id.iv_toggle_walking)
+        val tvWalking = findViewById<TextView>(R.id.tv_toggle_walking)
+        val ivBus = findViewById<ImageView>(R.id.iv_toggle_bus)
+        val tvBus = findViewById<TextView>(R.id.tv_toggle_bus)
+
+        val textDark = ContextCompat.getColor(this, R.color.text_dark)
+        val white = ContextCompat.getColor(this, R.color.white)
+
+        fun updateUI(isBus: Boolean) {
+            routeManager.isBusModeActive = isBus
+            
+            if (isBus) {
+                btnBus.setBackgroundResource(R.drawable.bg_primary_button)
+                ivBus.setColorFilter(white)
+                tvBus.setTextColor(white)
+
+                btnWalking.setBackgroundResource(android.R.color.transparent)
+                ivWalking.setColorFilter(textDark)
+                tvWalking.setTextColor(textDark)
+            } else {
+                btnWalking.setBackgroundResource(R.drawable.bg_primary_button)
+                ivWalking.setColorFilter(white)
+                tvWalking.setTextColor(white)
+
+                btnBus.setBackgroundResource(android.R.color.transparent)
+                ivBus.setColorFilter(textDark)
+                tvBus.setTextColor(textDark)
+            }
+        }
+
+        btnWalking.setOnClickListener { updateUI(false) }
+        btnBus.setOnClickListener { updateUI(true) }
+        
+        // Set initial state
+        updateUI(false)
     }
 
     private fun setupFavoriteChips() {
@@ -292,8 +311,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun openCityReport() {
         val url = "https://www.pmb.ro/interes-public/informatii/formuleaza-petitie"
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        startActivity(intent)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            data = Uri.parse(url)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Nu s-a putut deschide pagina. Verifică browser-ul.", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun reportBug() {
@@ -513,19 +539,47 @@ class MainActivity : AppCompatActivity() {
         val uid = auth.currentUser?.uid ?: return
         val ivMainProfile = findViewById<ImageView>(R.id.iv_main_profile)
         val mainRankFrame = findViewById<View>(R.id.main_rank_frame)
+        
+        // Navigation Header Views
+        val navView = findViewById<NavigationView>(R.id.nav_view)
+        val header = navView?.getHeaderView(0)
+        val tvNavUser = header?.findViewById<TextView>(R.id.tv_username)
+        val tvNavRank = header?.findViewById<TextView>(R.id.tv_nav_rank)
+        val ivNavPhoto = header?.findViewById<ImageView>(R.id.iv_user_photo)
+        val navRankFrame = header?.findViewById<View>(R.id.nav_rank_frame)
 
         db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
             if (snapshot != null && snapshot.exists()) {
+                val username = snapshot.getString("username")
                 val profileUrl = snapshot.getString("profileImageUrl")
                 val trust = snapshot.getLong("trustFactor")?.toInt() ?: 0
                 val rank = UserRank.fromTrustFactor(trust)
 
+                // Update Main UI
                 if (mainRankFrame != null) applyRankFrame(mainRankFrame, rank)
                 if (!isFinishing && ivMainProfile != null) {
                     Glide.with(this).load(profileUrl ?: android.R.drawable.ic_menu_gallery).circleCrop().into(ivMainProfile)
                 }
+
+                // Update Nav Header
+                tvNavUser?.text = username
+                tvNavRank?.text = rank.displayName
+                tvNavRank?.setTextColor(rank.color)
+                if (navRankFrame != null) applyRankFrame(navRankFrame, rank)
+                if (!isFinishing && ivNavPhoto != null) {
+                    Glide.with(this).load(profileUrl ?: android.R.drawable.ic_menu_gallery).circleCrop().into(ivNavPhoto)
+                }
             }
         }
+    }
+
+    private fun setupNavigationHeader(navView: NavigationView) {
+        val header = navView.getHeaderView(0)
+        header.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
+            drawerLayout.closeDrawer(GravityCompat.START)
+        }
+        // Listener logic moved to listenForUserData for performance
     }
 
     private fun applyRankFrame(view: View, rank: UserRank) {
@@ -534,33 +588,6 @@ class MainActivity : AppCompatActivity() {
         gd.setStroke(8, rank.color)
         gd.shape = GradientDrawable.OVAL
         view.background = gd
-    }
-
-    private fun setupNavigationHeader(navView: NavigationView) {
-        val header = navView.getHeaderView(0)
-        val tvUser = header.findViewById<TextView>(R.id.tv_username)
-        val tvRank = header.findViewById<TextView>(R.id.tv_nav_rank)
-        val ivPhoto = header.findViewById<ImageView>(R.id.iv_user_photo)
-        val rankFrame = header.findViewById<View>(R.id.nav_rank_frame)
-        
-        header.setOnClickListener {
-            startActivity(Intent(this, ProfileActivity::class.java))
-            drawerLayout.closeDrawer(GravityCompat.START)
-        }
-        
-        auth.currentUser?.let { user ->
-            db.collection("users").document(user.uid).addSnapshotListener { doc, _ ->
-                if (doc != null && doc.exists()) {
-                    val trust = doc.getLong("trustFactor")?.toInt() ?: 0
-                    val rank = UserRank.fromTrustFactor(trust)
-                    tvUser.text = doc.getString("username")
-                    tvRank.text = rank.displayName
-                    tvRank.setTextColor(rank.color)
-                    if (rankFrame != null) applyRankFrame(rankFrame, rank)
-                    if (!isFinishing) Glide.with(this).load(doc.getString("profileImageUrl") ?: android.R.drawable.ic_menu_gallery).circleCrop().into(ivPhoto)
-                }
-            }
-        }
     }
 
     private fun migrateOldGuardianData() {
@@ -689,6 +716,8 @@ class MainActivity : AppCompatActivity() {
             })
     }
 
+    private val iconCache = mutableMapOf<String, Bitmap>()
+
     private fun refreshMarkerIcon(uid: String) {
         val marker = protectedMarkers[uid] ?: return
         val baseBitmap = userBitmaps[uid] ?: return
@@ -696,10 +725,20 @@ class MainActivity : AppCompatActivity() {
         
         val size = 120
         val margin = 24
-        val finalBitmap = createBitmap(size + margin, size + margin, Bitmap.Config.ARGB_8888)
+        val totalSize = size + margin
         
-        val centerX = (size + margin) / 2f
-        val centerY = (size + margin) / 2f
+        // Use a cached bitmap if not in emergency to avoid allocations
+        if (!isEmergency) {
+            val cached = iconCache[uid]
+            if (cached != null) {
+                marker.icon = cached.toDrawable(resources)
+                return
+            }
+        }
+
+        val finalBitmap = createBitmap(totalSize, totalSize, Bitmap.Config.ARGB_8888)
+        val centerX = totalSize / 2f
+        val centerY = totalSize / 2f
         
         finalBitmap.applyCanvas {
             val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -716,6 +755,7 @@ class MainActivity : AppCompatActivity() {
             drawBitmap(baseBitmap, (margin / 2).toFloat(), (margin / 2).toFloat(), null)
         }
         
+        if (!isEmergency) iconCache[uid] = finalBitmap
         marker.icon = finalBitmap.toDrawable(resources)
     }
 

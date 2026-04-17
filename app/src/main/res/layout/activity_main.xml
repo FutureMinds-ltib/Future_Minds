@@ -28,7 +28,7 @@
             android:layout_marginStart="10dp"
             android:layout_marginTop="40dp"
             android:layout_marginEnd="10dp"
-            app:cardBackgroundColor="#5B5757"
+            app:cardBackgroundColor="@color/white"
             app:cardCornerRadius="40dp"
             app:cardElevation="8dp">
 
@@ -206,18 +206,79 @@
             </HorizontalScrollView>
         </LinearLayout>
 
-        <ImageButton
-            android:id="@+id/btn_future_bus"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+        <!-- Toggle for Walking/Bus -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/toggle_container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_above="@+id/relativeLayout"
             android:layout_centerHorizontal="true"
-            android:layout_marginBottom="4dp"
-            android:background="@drawable/bg_white_card"
-            android:backgroundTintMode="multiply"
-            android:src="@android:drawable/ic_dialog_map"
-            android:visibility="visible"
-            app:tint="@color/accent_blue" />
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="30dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/white">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <LinearLayout
+                    android:id="@+id/btn_toggle_walking"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_primary_button"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="8dp">
+
+                    <ImageView
+                        android:id="@+id/iv_toggle_walking"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@android:drawable/ic_menu_directions"
+                        app:tint="@color/white" />
+
+                    <TextView
+                        android:id="@+id/tv_toggle_walking"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="Walking"
+                        android:textColor="@color/white"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btn_toggle_bus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@android:color/transparent"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="8dp">
+
+                    <ImageView
+                        android:id="@+id/iv_toggle_bus"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@android:drawable/ic_dialog_map"
+                        app:tint="@color/text_dark" />
+
+                    <TextView
+                        android:id="@+id/tv_toggle_bus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="Bus"
+                        android:textColor="@color/text_dark"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
         <!-- Bottom Actions -->
         <RelativeLayout
@@ -269,15 +330,7 @@
 
         </RelativeLayout>
 
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/testare"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:layout_centerVertical="true"
-            android:layout_marginEnd="16dp"
-            android:text="Test"
-            android:textColor="@color/text_dark" />
+
 
     </RelativeLayout>
 

@@ -102,7 +102,7 @@ class MainActivity : AppCompatActivity() {
             if (isGranted) {
                 setupLocationOverlay()
             } else {
-                Toast.makeText(this, "Permisiunea de locație este necesară!", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, getString(R.string.location_permission_required), Toast.LENGTH_LONG).show()
             }
         }
 
@@ -168,7 +168,7 @@ class MainActivity : AppCompatActivity() {
         val reportBtn = findViewById<ImageButton>(R.id.button_report)
         reportBtn?.setOnClickListener { 
             isReportMode = true 
-            Toast.makeText(this, "Apasă lung pe hartă pentru a raporta!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.long_press_report_hint), Toast.LENGTH_SHORT).show()
         }
 
         val sosBtn = findViewById<Button>(R.id.button_sos)
@@ -182,7 +182,7 @@ class MainActivity : AppCompatActivity() {
         val routeBtn = findViewById<ImageButton>(R.id.button_route)
         routeBtn?.setOnClickListener {
             if(!locationSearch.pntBool) {
-                Toast.makeText(this, "No location selected", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.no_location_selected), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             calculateSafeRoute(locationSearch.pnt)
@@ -200,7 +200,7 @@ class MainActivity : AppCompatActivity() {
                         showReportDialog(it)
                         isReportMode = false
                     } else {
-                        locationSearch.zoomToLocation(it, "Punct selectat")
+                        locationSearch.zoomToLocation(it, getString(R.string.no_location_selected))
                     }
                 }
                 return true
@@ -268,23 +268,23 @@ class MainActivity : AppCompatActivity() {
                 
                 chipHome?.setOnClickListener {
                     (favorites?.get("home") as? String)?.let { address ->
-                        Toast.makeText(this, "Calculăm traseu spre Casă...", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, getString(R.string.calculating_route_home), Toast.LENGTH_SHORT).show()
                         calculateRouteToAddress(address)
-                    } ?: Toast.makeText(this, "Adresa 'Home' nu este setată!", Toast.LENGTH_SHORT).show()
+                    } ?: Toast.makeText(this, getString(R.string.home_not_set), Toast.LENGTH_SHORT).show()
                 }
                 
                 chipSchool?.setOnClickListener {
                     (favorites?.get("school") as? String)?.let { address ->
-                        Toast.makeText(this, "Calculăm traseu spre Școală...", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, getString(R.string.calculating_route_school), Toast.LENGTH_SHORT).show()
                         calculateRouteToAddress(address)
-                    } ?: Toast.makeText(this, "Adresa 'School' nu este setată!", Toast.LENGTH_SHORT).show()
+                    } ?: Toast.makeText(this, getString(R.string.school_not_set), Toast.LENGTH_SHORT).show()
                 }
                 
                 chipPark?.setOnClickListener {
                     (favorites?.get("park") as? String)?.let { address ->
-                        Toast.makeText(this, "Calculăm traseu spre Parc...", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, getString(R.string.calculating_route_park), Toast.LENGTH_SHORT).show()
                         calculateRouteToAddress(address)
-                    } ?: Toast.makeText(this, "Adresa 'Park' nu este setată!", Toast.LENGTH_SHORT).show()
+                    } ?: Toast.makeText(this, getString(R.string.park_not_set), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -301,7 +301,7 @@ class MainActivity : AppCompatActivity() {
                     locationSearch.zoomToLocation(destination, address)
                     calculateSafeRoute(destination)
                 } else {
-                    Toast.makeText(this@MainActivity, "Adresa nu a fost găsită!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, getString(R.string.address_not_found), Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error finding address", e)
@@ -318,7 +318,7 @@ class MainActivity : AppCompatActivity() {
         try {
             startActivity(intent)
         } catch (e: Exception) {
-            Toast.makeText(this, "Nu s-a putut deschide pagina. Verifică browser-ul.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.error_open_browser), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -330,7 +330,7 @@ class MainActivity : AppCompatActivity() {
         try {
             startActivity(intent)
         } catch (_: Exception) {
-            Toast.makeText(this, "Nu s-a găsit nicio aplicație de email!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.no_email_app_found), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -338,7 +338,7 @@ class MainActivity : AppCompatActivity() {
         if (!::locationOverlay.isInitialized) return
         locationOverlay.myLocation?.let {
             routeManager.getSafeRoute(it, destination, badZonesList)
-        } ?: Toast.makeText(this, "Așteaptă GPS...", Toast.LENGTH_SHORT).show()
+        } ?: Toast.makeText(this, getString(R.string.waiting_for_gps), Toast.LENGTH_SHORT).show()
     }
 
     private fun setupLocationOverlay() {
@@ -433,24 +433,24 @@ class MainActivity : AppCompatActivity() {
 
                 // --- 1. PREVENT DOUBLE VOTING ---
                 if (votedBy.contains(uid)) {
-                    Toast.makeText(this, "Ai votat deja pentru această zonă!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.already_voted), Toast.LENGTH_SHORT).show()
                     return@addOnSuccessListener
                 }
                 if (votedAgainst.contains(uid)) {
-                    Toast.makeText(this, "Ai votat deja pentru această zonă!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.already_voted), Toast.LENGTH_SHORT).show()
                     return@addOnSuccessListener
                 }
 
                 AlertDialog.Builder(this)
-                    .setTitle("Gestionare Zonă")
-                    .setMessage("Confirmi prezența acestui pericol sau dorești să îl contești?")
-                    .setPositiveButton("Elimină") { _, _ ->
+                    .setTitle(getString(R.string.manage_zone))
+                    .setMessage(getString(R.string.manage_zone_desc))
+                    .setPositiveButton(getString(R.string.remove_confirm)) { _, _ ->
                         handleVote(documentId, uid, myTrust, isConfirming = false)
                     }
-                    .setNegativeButton("Confirmă") { _, _ ->
+                    .setNegativeButton(getString(R.string.confirm)) { _, _ ->
                         handleVote(documentId, uid, myTrust, isConfirming = true)
                     }
-                    .setNeutralButton("Anulează", null)
+                    .setNeutralButton(getString(R.string.cancel), null)
                     .show()
             }
         }
@@ -476,7 +476,7 @@ class MainActivity : AppCompatActivity() {
                 // INCREASE trust of the zone
                 currentTrust += (voterTrust / 2).coerceAtLeast(1)
                 zoneRef.update("trust", currentTrust, "votedBy", votedBy, "votedAgainst", votedAgainst).addOnSuccessListener {
-                    Toast.makeText(this, "Zona a fost confirmată!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.zone_confirmed), Toast.LENGTH_SHORT).show()
                 }
             } else {
                 // DECREASE trust of the zone
@@ -488,11 +488,11 @@ class MainActivity : AppCompatActivity() {
 
                 if (currentTrust <= 0) {
                     zoneRef.delete().addOnSuccessListener {
-                        Toast.makeText(this, "Zona a fost eliminată. Scoruri actualizate.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, getString(R.string.zone_removed), Toast.LENGTH_SHORT).show()
                     }
                 } else {
                     zoneRef.update("trust", currentTrust, "votedBy", votedBy, "votedAgainst", votedAgainst).addOnSuccessListener {
-                        Toast.makeText(this, "Încrederea zonei a scăzut.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, getString(R.string.zone_trust_decreased), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -560,7 +560,7 @@ class MainActivity : AppCompatActivity() {
                     "trust" to trust
                 )
                 db.collection("danger_zones").add(report).addOnSuccessListener {
-                    Toast.makeText(this, "Raport trimis! Mulțumim.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.report_sent_thanks), Toast.LENGTH_SHORT).show()
                     dialog.dismiss()
                 }
             }
@@ -580,7 +580,7 @@ class MainActivity : AppCompatActivity() {
                 .get()
                 .addOnSuccessListener { connections ->
                     if (connections.isEmpty) {
-                        Toast.makeText(this, "Nu ai gardieni!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, getString(R.string.no_guardians_error), Toast.LENGTH_SHORT).show()
                         return@addOnSuccessListener
                     }
                     
@@ -597,7 +597,7 @@ class MainActivity : AppCompatActivity() {
                         )
                         db.collection("sos_alerts").add(alert)
                     }
-                    Toast.makeText(this, "SOS trimis gardienilor și locația activată pentru toți!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, getString(R.string.sos_sent_msg), Toast.LENGTH_LONG).show()
                     locationOverlay.myLocation?.let { updateMyLocationInFirestore(it.latitude, it.longitude) }
                 }
         }
@@ -624,7 +624,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showSosDialog(message: String, alertId: String) {
         AlertDialog.Builder(this)
-            .setTitle("ALERTĂ SOS!")
+            .setTitle(getString(R.string.sos))
             .setMessage(message)
             .setPositiveButton("OK") { _, _ ->
                 db.collection("sos_alerts").document(alertId).update("status", "read")
@@ -635,9 +635,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun showSignOutConfirmation() {
         AlertDialog.Builder(this)
-            .setMessage("Ieși din cont?")
-            .setPositiveButton("Da") { _, _ -> signOut() }
-            .setNegativeButton("Nu", null)
+            .setMessage(getString(R.string.logout_confirm_msg))
+            .setPositiveButton(getString(R.string.yes)) { _, _ -> signOut() }
+            .setNegativeButton(getString(R.string.no), null)
             .show()
     }
 
@@ -662,6 +662,9 @@ class MainActivity : AppCompatActivity() {
         val ivNavPhoto = header?.findViewById<ImageView>(R.id.iv_user_photo)
         val navRankFrame = header?.findViewById<View>(R.id.nav_rank_frame)
 
+        val tvHeaderName = findViewById<TextView>(R.id.tv_header_name)
+        val tvHeaderRank = findViewById<TextView>(R.id.tv_header_rank)
+
         db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
             if (snapshot != null && snapshot.exists()) {
                 val username = snapshot.getString("username")
@@ -670,14 +673,18 @@ class MainActivity : AppCompatActivity() {
                 val rank = UserRank.fromTrustFactor(trust)
 
                 // Update Main UI
+                tvHeaderName?.text = username ?: getString(R.string.guest_user)
+                tvHeaderRank?.text = rank.getDisplayName(this@MainActivity)
+                tvHeaderRank?.setBackgroundColor(rank.color)
+
                 if (mainRankFrame != null) applyRankFrame(mainRankFrame, rank)
                 if (!isFinishing && ivMainProfile != null) {
                     Glide.with(this).load(profileUrl ?: android.R.drawable.ic_menu_gallery).circleCrop().into(ivMainProfile)
                 }
 
                 // Update Nav Header
-                tvNavUser?.text = username
-                tvNavRank?.text = rank.displayName
+                tvNavUser?.text = username ?: getString(R.string.guest_user)
+                tvNavRank?.text = rank.getDisplayName(this@MainActivity)
                 tvNavRank?.setTextColor(rank.color)
                 if (navRankFrame != null) applyRankFrame(navRankFrame, rank)
                 if (!isFinishing && ivNavPhoto != null) {
@@ -745,10 +752,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun showRequestDialog(name: String, connectionId: String) {
         AlertDialog.Builder(this)
-            .setTitle("Cerere Gardian")
-            .setMessage("$name vrea să îi fii gardian. Accepți?")
-            .setPositiveButton("Accept") { _, _ -> updateConnectionStatus(connectionId, "accepted") }
-            .setNegativeButton("Refuz") { _, _ -> updateConnectionStatus(connectionId, "rejected") }
+            .setTitle(getString(R.string.guardian_request_title))
+            .setMessage(getString(R.string.guardian_request_desc, name))
+            .setPositiveButton(getString(R.string.accept)) { _, _ -> updateConnectionStatus(connectionId, "accepted") }
+            .setNegativeButton(getString(R.string.decline)) { _, _ -> updateConnectionStatus(connectionId, "rejected") }
             .show()
     }
 

@@ -12,7 +12,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="Locații Favorite"
+        android:text="@string/fav_locations"
         android:textColor="@color/text_dark"
         android:textSize="26sp"
         android:textStyle="bold"
@@ -37,7 +37,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="ACASĂ (HOME)"
+                android:text="@string/home"
                 android:textColor="@color/home_blue"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -72,7 +72,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="ȘCOALĂ / MUNCĂ"
+                android:text="@string/school"
                 android:textColor="@color/school_green"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -107,7 +107,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="PARC / TIMP LIBER"
+                android:text="@string/park"
                 android:textColor="@color/park_lime"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -128,7 +128,7 @@
         android:id="@+id/btn_save_favorites"
         android:layout_width="match_parent"
         android:layout_height="60dp"
-        android:text="Salvează Modificările"
+        android:text="@string/save_changes"
         android:textAllCaps="false"
         android:background="@drawable/bg_primary_button"
         android:textColor="@color/white"
@@ -142,7 +142,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:layout_marginTop="32dp"
-        android:text="← Înapoi"
+        android:text="@string/back_btn"
         android:textColor="@color/text_gray"
         android:textStyle="bold"
         android:padding="16dp" />

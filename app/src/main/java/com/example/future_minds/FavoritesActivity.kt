@@ -66,11 +66,11 @@ class FavoritesActivity : AppCompatActivity() {
 
         db.collection("users").document(uid).update("favorites", favorites)
             .addOnSuccessListener {
-                Toast.makeText(this, "Locații salvate cu succes!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.favorites_saved_success), Toast.LENGTH_SHORT).show()
                 finish()
             }
             .addOnFailureListener { e ->
-                Toast.makeText(this, "Eroare la salvare: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.error_saving_favorites) + ": ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
 }

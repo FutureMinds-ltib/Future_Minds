@@ -36,7 +36,7 @@ class UserAdapter(private val users: List<UserProfile>) : RecyclerView.Adapter<U
         val user = users[position]
         holder.tvUsername.text = user.username
         val rank = UserRank.fromTrustFactor(user.trustFactor)
-        holder.tvRank.text = rank.displayName
+        holder.tvRank.text = rank.getDisplayName(holder.itemView.context)
         holder.tvRank.setTextColor(rank.color)
         
         holder.tvTrust.text = holder.itemView.context.getString(R.string.trust_factor_label, user.trustFactor)

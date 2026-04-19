@@ -4,44 +4,44 @@
         <item
             android:id="@+id/nav_profile"
             android:icon="@android:drawable/ic_menu_edit"
-            android:title="Profile &amp; Ranking" />
+            android:title="@string/profile_ranking" />
         <item
             android:id="@+id/nav_personal_data"
             android:icon="@android:drawable/ic_menu_info_details"
-            android:title="Date Personale" />
+            android:title="@string/personal_data" />
         <item
             android:id="@+id/nav_guardian"
             android:icon="@android:drawable/ic_menu_myplaces"
-            android:title="Gardianul tău" />
+            android:title="@string/your_guardian" />
         <item
             android:id="@+id/nav_protected"
             android:icon="@android:drawable/ic_menu_view"
-            android:title="Protejații mei" />
+            android:title="@string/my_protected" />
     </group>
 
-    <item android:title="Locații Favorite">
+    <item android:title="@string/fav_locations">
         <menu>
             <item
                 android:id="@+id/nav_manage_favs"
                 android:icon="@android:drawable/ic_menu_manage"
-                android:title="Gestionază locațiile favorite" />
+                android:title="@string/manage_favs" />
         </menu>
     </item>
 
-    <item android:title="Altele">
+    <item android:title="@string/others">
         <menu>
             <item
                 android:id="@+id/nav_report_bug"
                 android:icon="@android:drawable/ic_menu_send"
-                android:title="Raportează Bug Aplicație" />
+                android:title="@string/report_bug" />
             <item
                 android:id="@+id/nav_report_city"
                 android:icon="@android:drawable/ic_menu_compass"
-                android:title="Raportează o problemă primăriei" />
+                android:title="@string/report_city" />
             <item
                 android:id="@+id/nav_logout"
                 android:icon="@android:drawable/ic_lock_power_off"
-                android:title="Sign Out" />
+                android:title="@string/sign_out" />
         </menu>
     </item>
 </menu>

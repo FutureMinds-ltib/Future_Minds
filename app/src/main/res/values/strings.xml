@@ -1,17 +1,199 @@
 <resources>
-    <string name="app_name">Future_Minds</string>
-    <string name="action_settings">Settings</string>
+    <string name="app_name">SafeWay</string>
+    <string name="action_settings">Setări</string>
     <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">First Fragment</string>
-    <string name="second_fragment_label">Second Fragment</string>
-    <string name="next">Next</string>
-    <string name="previous">Previous</string>
+    <string name="first_fragment_label">Primul Fragment</string>
+    <string name="second_fragment_label">Al doilea Fragment</string>
+    <string name="next">Înainte</string>
+    <string name="previous">Înapoi</string>
     <string name="trust_factor_label">TF: %1$d</string>
 
     <string name="last_update_live">Ultima actualizare: live</string>
     <string name="last_update_format">Ultima actualizare: %1$s</string>
     <string name="location_unknown">Locație necunoscută</string>
-    <string name="guest_user">Guest User</string>
-    <string name="affected_area_format">Affected Area: %1$dm</string>
+    <string name="guest_user">Vizitator</string>
+    <string name="affected_area_format">Zonă afectată: %1$dm</string>
     <string name="submit_report">Trimite Raport</string>
+    <string name="walking">Pe jos</string>
+    <string name="bus">Autobuz</string>
+    <string name="where_are_we_going">Unde mergem?</string>
+    <string name="home">Acasă</string>
+    <string name="school">Școală</string>
+    <string name="park">Parc</string>
+    <string name="sos">SOS</string>
+    <string name="welcome_back">Bine ai revenit!</string>
+    <string name="ready_journey">Ești gata pentru o nouă călătorie în siguranță?</string>
+    <string name="email_address">Adresă Email</string>
+    <string name="enter_email">Introdu adresa de email</string>
+    <string name="password">Parolă</string>
+    <string name="forgot_password">Ai uitat parola?</string>
+    <string name="log_in">Autentificare →</string>
+    <string name="continue_guest">Continuă ca vizitator</string>
+    <string name="dont_have_account">Nu ai cont? </string>
+    <string name="sign_up">Înscrie-te</string>
+    <string name="profile_ranking">Profil și Clasament</string>
+    <string name="personal_data">Date Personale</string>
+    <string name="your_guardian">Gardianul tău</string>
+    <string name="my_protected">Protejații mei</string>
+    <string name="fav_locations">Locații Favorite</string>
+    <string name="manage_favs">Gestionază locațiile favorite</string>
+    <string name="others">Altele</string>
+    <string name="report_bug">Raportează Bug Aplicație</string>
+    <string name="report_city">Raportează o problemă primăriei</string>
+    <string name="sign_out">Deconectare</string>
+    <string name="back_btn">← Înapoi</string>
+    <string name="edit_photo">Schimbă poza</string>
+    <string name="remove">Șterge</string>
+    <string name="community_ranking">Clasament Comunitate</string>
+    <string name="trust_factor_val">Factor de Încredere: %1$d</string>
+    <string name="report_issue">Raportează o problemă</string>
+    <string name="what_is_problem">Care este problema?</string>
+    <string name="affected_area">Zonă afectată: %1$d m</string>
+
+    <!-- Register Screen -->
+    <string name="join_adventure">Alătură-te aventurii!</string>
+    <string name="create_safety_path">Creează-ți drumul spre siguranță astăzi.</string>
+    <string name="your_name">Numele tău</string>
+    <string name="name_hint">Cum te numești?</string>
+    <string name="phone_number">Număr de telefon</string>
+    <string name="secret_password">Parolă Secretă</string>
+    <string name="password_hint">Alege una puternică</string>
+    <string name="already_part_team">Ești deja parte din echipă? Autentifică-te</string>
+
+    <!-- Guardian Screen -->
+    <string name="guardian_title">Gardianul tău</string>
+    <string name="guardian_desc">Persoana care primește alerte SOS și îți poate vedea locația în timp real.</string>
+    <string name="no_guardian_set">Nu ai niciun gardian setat.</string>
+    <string name="add_guardian">Adaugă Gardian</string>
+
+    <!-- Protected Screen -->
+    <string name="protected_title">Protejații mei</string>
+    <string name="protected_desc">Persoanele care te-au ales ca gardian. Vei primi alerte de la ele.</string>
+    <string name="no_protected">Nu ai nicio persoană sub protecție.</string>
+
+    <!-- Favorites Screen -->
+    <string name="favorites_title">Locații Favorite</string>
+    <string name="add_favorite">Adaugă Favorit</string>
+    <string name="no_favorites">Nu ai locații favorite salvate.</string>
+
+    <!-- Personal Data Screen -->
+    <string name="personal_data_title">Date Personale</string>
+    <string name="save_changes">Salvează Modificările</string>
+
+    <!-- Forgot Password Screen -->
+    <string name="forgot_password_title">Ai uitat parola?</string>
+    <string name="forgot_password_desc">Introdu email-ul tău și îți vom trimite un link de resetare.</string>
+    <string name="send_reset_link">Trimite Link Resetare</string>
+    <string name="back_to_login">Înapoi la Autentificare</string>
+
+    <!-- Toast & Dialog Messages -->
+    <string name="calculating_route_home">Calculăm traseul spre Casă...</string>
+    <string name="calculating_route_school">Calculăm traseul spre Școală...</string>
+    <string name="calculating_route_park">Calculăm traseul spre Parc...</string>
+    <string name="home_not_set">Adresa „Acasă” nu este setată!</string>
+    <string name="school_not_set">Adresa „Școală” nu este setată!</string>
+    <string name="park_not_set">Adresa „Parc” nu este setată!</string>
+    <string name="already_voted">Ai votat deja pentru această zonă!</string>
+    <string name="sos_sent_msg">SOS trimis gardienilor și locația activată pentru toți!</string>
+    <string name="zone_confirmed">Zona a fost confirmată!</string>
+    <string name="long_press_report_hint">Apasă lung pe hartă pentru a raporta!</string>
+    <string name="zone_trust_decreased">Încrederea zonei a scăzut.</string>
+    <string name="zone_removed">Zona a fost eliminată. Scoruri actualizate.</string>
+    <string name="waiting_for_gps">Așteaptă GPS...</string>
+    <string name="no_location_selected">Nicio locație selectată</string>
+    <string name="no_guardians_error">Nu ai gardieni setați!</string>
+    <string name="report_sent_thanks">Raport trimis! Mulțumim.</string>
+    <string name="location_permission_required">Permisiunea de locație este necesară!</string>
+    <string name="no_email_app_found">Nu s-a găsit nicio aplicație de email!</string>
+    <string name="address_not_found">Adresa nu a fost găsită!</string>
+    <string name="error_open_browser">Nu s-a putut deschide pagina. Verifică browser-ul.</string>
+
+    <string name="verify_email_msg">Vă rugăm să vă verificați adresa de email!</string>
+    <string name="fill_all_fields">Vă rugăm să completați toate câmpurile!</string>
+    <string name="login_failed_format">Autentificare eșuată: %1$s</string>
+    <string name="guest_login_failed">Autentificarea ca vizitator a eșuat.</string>
+
+    <string name="account_created_verify">Cont creat! Verifică email-ul pentru confirmare.</string>
+    <string name="error_sending_verification">Eroare la trimiterea email-ului de verificare.</string>
+    <string name="error_saving_data">Eroare la salvarea datelor.</string>
+
+    <string name="image_removed">Imagine eliminată!</string>
+    <string name="loading_image">Se încarcă imaginea...</string>
+    <string name="image_updated">Imagine actualizată!</string>
+    <string name="upload_error">Eroare la încărcare.</string>
+
+    <string name="username_not_found">Utilizatorul nu a fost găsit!</string>
+    <string name="phone_mismatch">Numărul de telefon nu corespunde!</string>
+    <string name="request_sent">Cerere trimisă cu succes!</string>
+    <string name="already_connected">Există deja o conexiune cu acest utilizator!</string>
+    <string name="phone_not_confirmed_msg">Numărul tău de telefon nu este confirmat! Verifică-l în Date Personale.</string>
+    <string name="guardian_removed">Gardian eliminat.</string>
+    <string name="no_longer_guardian_format">Nu mai ești gardianul lui %1$s</string>
+
+    <string name="phone_not_set">Numărul de telefon nu este setat!</string>
+    <string name="phone_verified_success">Număr de telefon verificat cu succes!</string>
+    <string name="sending_sms_format">Se trimite SMS către %1$s...</string>
+    <string name="incorrect_code">Codul introdus este incorect!</string>
+    <string name="searching">Căutăm...</string>
+    <string name="location_not_found">Locația nu a fost găsită.</string>
+    <string name="safe_route_longer_hint">Notă: Traseul sigur este semnificativ mai lung. Traseul rapid este afișat cu roșu întrerupt.</string>
+    <string name="no_bus_available">Autobuzul nu este disponibil. Calculăm trasee sigure pe jos...</string>
+    <string name="network_error">Eroare de rețea</string>
+    <string name="destination_too_far">Destinația este prea departe: %1$s km</string>
+    <string name="safe_route_label">Traseu Sigur: %1$s</string>
+    <string name="fast_route_label">Traseu Rapid: %1$s</string>
+    <string name="minutes_format">%1$d min</string>
+    <string name="less_than_one_minute">&lt; 1 min</string>
+    <string name="location_search_not_available">Căutarea locației nu este disponibilă pe acest dispozitiv.</string>
+    <string name="favorites_saved_success">Locații salvate cu succes!</string>
+    <string name="error_saving_favorites">Eroare la salvarea locațiilor favorite.</string>
+    <string name="you_are_guardian_of">Ești gardianul lui</string>
+    <string name="enter_email_error">Introduceți email-ul!</string>
+    <string name="reset_email_sent_format">Email de resetare trimis cu succes la %1$s</string>
+    <string name="error_format">Eroare: %1$s</string>
+    <string name="rank_novice">Explorator Novice</string>
+    <string name="rank_guardian_1">Gardian Nivel 1</string>
+    <string name="rank_guardian_2">Gardian Nivel 2</string>
+    <string name="rank_elite">Gardian Elită</string>
+    <string name="rank_legendary">Gardian Legendar</string>
+    <string name="rank_label">Grad: %1$s</string>
+    <string name="status_format">Status: %1$s</string>
+    <string name="guardian_no_phone_verified">Utilizatorul %1$s nu poate fi adăugat ca gardian deoarece nu are numărul de telefon confirmat.</string>
+    <string name="not_set">Nesetat</string>
+    <string name="verified">Verificat</string>
+    <string name="not_verified">Neverificat</string>
+    <string name="sms_error_format">Eroare SMS: %1$s</string>
+    <string name="sms_verification_title">Verificare SMS</string>
+    <string name="sms_verification_desc">Introdu codul primit prin SMS:</string>
+    <string name="confirm">Confirmă</string>
+    <string name="cancel">Anulează</string>
+    <string name="sms_code_hint">Codul din 6 cifre</string>
+    <string name="bus_stop_title_format">Stație: %1$s</string>
+    <string name="bus_stop_fallback">Stație Autobuz</string>
+    <string name="walk_label">Pe jos</string>
+    <string name="bus_fallback">Autobuz</string>
+    <string name="bus_not_available_walking">Autobuzul nu este disponibil. Se afișează traseul pe jos.</string>
+    <string name="password_dots">********</string>
+    <string name="request_from_format">Cerere de la %1$s</string>
+    <string name="request_desc_format">%1$s dorește să îi fii gardian.</string>
+    <string name="accept">Acceptă</string>
+    <string name="decline">Refuză</string>
+    <string name="sign_out_confirm_title">Deconectare</string>
+    <string name="sign_out_confirm_msg">Ești sigur că vrei să te deconectezi?</string>
+    <string name="sos_from_format">SOS de la %1$s!</string>
+    <string name="sos_location_msg">Vrei să vezi locația?</string>
+    <string name="view_on_map">Vezi pe hartă</string>
+    <string name="close">Închide</string>
+    <string name="delete_report_title">Șterge Raport</string>
+    <string name="delete_report_msg">Vrei să confirmi această problemă sau să o elimini (dacă nu mai este validă)?</string>
+    <string name="confirm_btn">Confirmă (+10 trust)</string>
+    <string name="remove_btn">Nu există (-10 trust)</string>
+    <string name="manage_zone">Gestionare Zonă</string>
+    <string name="manage_zone_desc">Confirmi prezența acestui pericol sau dorești să îl contești?</string>
+    <string name="remove_confirm">Elimină</string>
+    <string name="guardian_request_title">Cerere Gardian</string>
+    <string name="guardian_request_desc">%1$s vrea să îi fii gardian. Accepți?</string>
+    <string name="logout_confirm_msg">Ieși din cont?</string>
+    <string name="yes">Da</string>
+    <string name="no">Nu</string>
 </resources>

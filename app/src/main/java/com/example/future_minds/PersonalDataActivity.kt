@@ -66,18 +66,18 @@ class PersonalDataActivity : AppCompatActivity() {
                 val phone = snapshot.getString("phone") ?: ""
                 val isVerified = snapshot.getBoolean("phoneVerified") ?: false
 
-                tvPhone.text = if (phone.isEmpty()) "Nesetat" else phone
+                tvPhone.text = if (phone.isEmpty()) getString(R.string.not_set) else phone
 
                 if (isVerified) {
                     ivPhoneStatus.setImageResource(android.R.drawable.checkbox_on_background)
                     ivPhoneStatus.setColorFilter(android.graphics.Color.parseColor("#4CAF50"))
-                    tvPhoneStatusText.text = "Verificat"
+                    tvPhoneStatusText.text = getString(R.string.verified)
                     tvPhoneStatusText.setTextColor(android.graphics.Color.parseColor("#4CAF50"))
                     btnVerifyPhone.visibility = View.GONE
                 } else {
                     ivPhoneStatus.setImageResource(android.R.drawable.ic_dialog_alert)
                     ivPhoneStatus.setColorFilter(android.graphics.Color.parseColor("#F44336"))
-                    tvPhoneStatusText.text = "Neverificat"
+                    tvPhoneStatusText.text = getString(R.string.not_verified)
                     tvPhoneStatusText.setTextColor(android.graphics.Color.parseColor("#F44336"))
                     btnVerifyPhone.visibility = if (phone.isNotEmpty()) View.VISIBLE else View.GONE
                 }
@@ -88,7 +88,7 @@ class PersonalDataActivity : AppCompatActivity() {
     private fun startPhoneNumberVerification() {
         val phone = tvPhone.text.toString()
         if (phone.isEmpty() || phone == "Nesetat") {
-            Toast.makeText(this, "Numărul de telefon nu este setat!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.phone_not_set), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -103,7 +103,7 @@ class PersonalDataActivity : AppCompatActivity() {
             .build()
         PhoneAuthProvider.verifyPhoneNumber(options)
         
-        Toast.makeText(this, "Se trimite SMS către $formattedPhone...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.sending_sms_format, formattedPhone), Toast.LENGTH_SHORT).show()
     }
 
     private val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
@@ -112,7 +112,7 @@ class PersonalDataActivity : AppCompatActivity() {
         }
 
         override fun onVerificationFailed(e: FirebaseException) {
-            Toast.makeText(this@PersonalDataActivity, "Eroare SMS: ${e.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(this@PersonalDataActivity, getString(R.string.sms_error_format, e.message), Toast.LENGTH_LONG).show()
         }
 
         override fun onCodeSent(verificationId: String, token: PhoneAuthProvider.ForceResendingToken) {
@@ -123,21 +123,21 @@ class PersonalDataActivity : AppCompatActivity() {
 
     private fun showCodeInputDialog() {
         val input = EditText(this)
-        input.hint = "Codul din 6 cifre"
+        input.hint = getString(R.string.sms_code_hint)
         input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
 
         AlertDialog.Builder(this)
-            .setTitle("Verificare SMS")
-            .setMessage("Introdu codul primit prin SMS:")
+            .setTitle(getString(R.string.sms_verification_title))
+            .setMessage(getString(R.string.sms_verification_desc))
             .setView(input)
-            .setPositiveButton("Confirmă") { _, _ ->
+            .setPositiveButton(getString(R.string.confirm)) { _, _ ->
                 val code = input.text.toString().trim()
                 if (code.isNotEmpty() && verificationId != null) {
                     val credential = PhoneAuthProvider.getCredential(verificationId!!, code)
                     linkPhoneWithAccount(credential)
                 }
             }
-            .setNegativeButton("Anulează", null)
+            .setNegativeButton(getString(R.string.cancel), null)
             .show()
     }
 
@@ -147,7 +147,7 @@ class PersonalDataActivity : AppCompatActivity() {
                 if (task.isSuccessful) {
                     verifyPhoneNumberInFirestore()
                 } else {
-                    Toast.makeText(this, "Codul introdus este incorect!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.incorrect_code), Toast.LENGTH_SHORT).show()
                 }
             }
     }
@@ -156,7 +156,7 @@ class PersonalDataActivity : AppCompatActivity() {
         val uid = auth.currentUser?.uid ?: return
         db.collection("users").document(uid).update("phoneVerified", true)
             .addOnSuccessListener {
-                Toast.makeText(this, "Număr de telefon verificat cu succes!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.phone_verified_success), Toast.LENGTH_SHORT).show()
             }
     }
 }

@@ -26,7 +26,7 @@ class ForgotPasswordActivity : AppCompatActivity() {
             val email = etEmail.text.toString().trim()
 
             if (email.isEmpty()) {
-                etEmail.error = "Introduceți email-ul!"
+                etEmail.error = getString(R.string.enter_email_error)
                 return@setOnClickListener
             }
 
@@ -36,14 +36,14 @@ class ForgotPasswordActivity : AppCompatActivity() {
                     if (task.isSuccessful) {
                         Toast.makeText(
                             this,
-                            "Email de resetare trimis cu succes la $email",
+                            getString(R.string.reset_email_sent_format, email),
                             Toast.LENGTH_LONG
                         ).show()
                         finish() // Ne întoarcem la ecranul de Login
                     } else {
                         Toast.makeText(
                             this,
-                            "Eroare: ${task.exception?.message}",
+                            getString(R.string.error_format, task.exception?.message),
                             Toast.LENGTH_LONG
                         ).show()
                     }

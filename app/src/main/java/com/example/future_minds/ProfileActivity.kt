@@ -80,16 +80,16 @@ class ProfileActivity : AppCompatActivity() {
         db.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
             if (isFinishing || isDestroyed) return@addSnapshotListener
             if (snapshot != null && snapshot.exists()) {
-                val username = snapshot.getString("username") ?: "User"
+                val username = snapshot.getString("username") ?: getString(R.string.guest_user)
                 val profileUrl = snapshot.getString("profileImageUrl")
                 // Corectat: citim trustFactor in loc de trust
                 val trustFactor = snapshot.getLong("trustFactor")?.toInt() ?: 0
                 val rank = UserRank.fromTrustFactor(trustFactor)
 
                 tvUsername.text = username
-                tvRank.text = "Rank: ${rank.displayName}"
+                tvRank.text = getString(R.string.rank_label, rank.getDisplayName(this@ProfileActivity))
                 tvRank.setTextColor(rank.color)
-                tvTrustFactor.text = "Trust Factor: $trustFactor"
+                tvTrustFactor.text = getString(R.string.trust_factor_val, trustFactor)
                 applyRankFrame(rankFrame, rank)
 
                 Glide.with(this)
@@ -112,17 +112,17 @@ class ProfileActivity : AppCompatActivity() {
         val uid = auth.currentUser?.uid ?: return
         val ref = storage.reference.child("profile_images/$uid.jpg")
         
-        Toast.makeText(this, "Se încarcă imaginea...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.loading_image), Toast.LENGTH_SHORT).show()
         
         ref.putFile(uri).addOnSuccessListener {
             ref.downloadUrl.addOnSuccessListener { downloadUri ->
                 db.collection("users").document(uid).update("profileImageUrl", downloadUri.toString())
                     .addOnSuccessListener {
-                        Toast.makeText(this, "Imagine actualizată!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, getString(R.string.image_updated), Toast.LENGTH_SHORT).show()
                     }
             }
         }.addOnFailureListener {
-            Toast.makeText(this, "Eroare la încărcare: ${it.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.upload_error) + ": ${it.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -130,7 +130,7 @@ class ProfileActivity : AppCompatActivity() {
         val uid = auth.currentUser?.uid ?: return
         db.collection("users").document(uid).update("profileImageUrl", null)
             .addOnSuccessListener {
-                Toast.makeText(this, "Imagine eliminată!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.image_removed), Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -165,13 +165,13 @@ class ProfileActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val user = users[position]
-            val name = user["username"] as? String ?: "User"
+            val name = user["username"] as? String ?: getString(R.string.guest_user)
             val factor = (user["trustFactor"] as? Long)?.toInt() ?: 0
             val photoUrl = user["profileImageUrl"] as? String
             val rank = UserRank.fromTrustFactor(factor)
 
             holder.tvName.text = "${position + 1}. $name"
-            holder.tvFactor.text = "TF: $factor"
+            holder.tvFactor.text = getString(R.string.trust_factor_label, factor)
             holder.tvName.setTextColor(rank.color)
             
             val gd = GradientDrawable()

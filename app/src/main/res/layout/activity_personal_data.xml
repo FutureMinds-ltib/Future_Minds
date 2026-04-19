@@ -13,7 +13,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="Date Personale"
+        android:text="@string/personal_data_title"
         android:textColor="@color/text_dark"
         android:textSize="26sp"
         android:textStyle="bold"
@@ -38,7 +38,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="ADRESA EMAIL"
+                android:text="@string/email_address"
                 android:textColor="@color/text_gray"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -95,7 +95,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="NUMĂR TELEFON"
+                android:text="@string/phone_number"
                 android:textColor="@color/text_gray"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -159,7 +159,7 @@
             android:id="@+id/btn_nav_guardians"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:text="Gardienii Mei"
+            android:text="@string/your_guardian"
             android:textAllCaps="false"
             android:background="@drawable/bg_white_card"
             android:textColor="@color/primary_blue"
@@ -170,7 +170,7 @@
             android:id="@+id/btn_nav_protected"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:text="Protejații Mei"
+            android:text="@string/my_protected"
             android:textAllCaps="false"
             android:background="@drawable/bg_white_card"
             android:textColor="@color/primary_blue"
@@ -184,7 +184,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:layout_marginTop="32dp"
-        android:text="← Înapoi"
+        android:text="@string/back_btn"
         android:textColor="@color/text_gray"
         android:textStyle="bold" />
 

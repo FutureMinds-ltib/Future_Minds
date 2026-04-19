@@ -40,7 +40,7 @@ class RouteManager(private val context: Context, private val map: MapView) {
 
         val distanceKm = calculateDistance(start, end)
         if (distanceKm > 100) {
-            showToast("Destination too far: ${String.format(Locale.US, "%.1f", distanceKm)} km")
+            showToast(context.getString(R.string.destination_too_far, String.format(Locale.US, "%.1f", distanceKm)))
             return
         }
 
@@ -138,7 +138,7 @@ class RouteManager(private val context: Context, private val map: MapView) {
 
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                Handler(Looper.getMainLooper()).post { showToast("Network error") }
+                Handler(Looper.getMainLooper()).post { showToast(context.getString(R.string.network_error)) }
             }
 
             override fun onResponse(call: Call, response: Response) {
@@ -216,7 +216,7 @@ class RouteManager(private val context: Context, private val map: MapView) {
             }
 
             if (!hasTransit) {
-                showToast("No bus available. Calculating safe walking routes...")
+                showToast(context.getString(R.string.no_bus_available))
                 // Clear current overlays
                 //clearRoutes()
 
@@ -243,9 +243,9 @@ class RouteManager(private val context: Context, private val map: MapView) {
                 if (mode == "WALK") {
                     polyline.outlinePaint.color = Color.GRAY
                     polyline.outlinePaint.strokeWidth = 12f
-                    polyline.title = "Walk"
+                    polyline.title = context.getString(R.string.walk_label)
                 } else {
-                    val busName = leg.optString("routeShortName", "Bus")
+                    val busName = leg.optString("routeShortName", context.getString(R.string.bus_fallback))
                     val headsign = leg.optString("headsign", "")
 
                     polyline.outlinePaint.color = Color.BLUE
@@ -276,7 +276,7 @@ class RouteManager(private val context: Context, private val map: MapView) {
                         stopMarker.position = GeoPoint(stopJson.getDouble("lat"), stopJson.getDouble("lon"))
                         stopMarker.setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
                         stopMarker.icon = stationIcon
-                        stopMarker.title = "Stop: " + stopJson.optString("name", "Bus Stop")
+                        stopMarker.title = context.getString(R.string.bus_stop_title_format, stopJson.optString("name", context.getString(R.string.bus_stop_fallback)))
                         stopMarker.infoWindow = null // Keep it simple, info is on the line
                         map.overlays.add(stopMarker)
                     }
@@ -331,7 +331,7 @@ class RouteManager(private val context: Context, private val map: MapView) {
             }
 
             if (!hasTransit) {
-                showToast("Bus not available. Showing walking route.")
+                showToast(context.getString(R.string.bus_not_available_walking))
             }
 
             // Build the GeoJSON structure that processAndDrawRoute expects
@@ -415,14 +415,14 @@ class RouteManager(private val context: Context, private val map: MapView) {
                 safeRouteOverlay?.let { map.overlays.remove(it) }
                 polyline.outlinePaint.color = "#4CAF50".toColorInt()
                 polyline.outlinePaint.strokeWidth = 14f
-                polyline.title = "Safe Route: ${formatTime(duration)}"
+                polyline.title = context.getString(R.string.safe_route_label, formatTime(duration))
                 safeRouteOverlay = polyline
             } else {
                 fastRouteOverlay?.let { map.overlays.remove(it) }
                 polyline.outlinePaint.color = "#F44336".toColorInt()
                 polyline.outlinePaint.strokeWidth = 10f
                 polyline.outlinePaint.pathEffect = DashPathEffect(floatArrayOf(20f, 20f), 0f)
-                polyline.title = "Fastest Route: ${formatTime(duration)}"
+                polyline.title = context.getString(R.string.fast_route_label, formatTime(duration))
                 fastRouteOverlay = polyline
             }
 
@@ -444,14 +444,14 @@ class RouteManager(private val context: Context, private val map: MapView) {
             val fastTime = parseDuration(fastRouteOverlay?.title ?: "")
 
             if (safeTime > fastTime * 1.5) {
-                showToast("Note: Safe route is significantly longer. Fast route is shown in dashed red.")
+                showToast(context.getString(R.string.safe_route_longer_hint))
             }
         }
     }
 
     private fun formatTime(seconds: Double): String {
         val minutes = (seconds / 60).toInt()
-        return if (minutes < 1) "< 1 min" else "$minutes min"
+        return if (minutes < 1) context.getString(R.string.less_than_one_minute) else context.getString(R.string.minutes_format, minutes)
     }
 
     private fun parseDuration(title: String): Int {

@@ -44,7 +44,7 @@
             android:id="@+id/tv_username"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Guest User"
+            android:text="@string/guest_user"
             android:textColor="@color/primary_blue"
             android:textSize="20sp"
             android:textStyle="bold" />
@@ -53,7 +53,7 @@
             android:id="@+id/tv_nav_rank"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Novice Explorer"
+            android:text="@string/rank_novice"
             android:textColor="@color/text_gray"
             android:textSize="14sp" />
     </LinearLayout>

@@ -54,14 +54,14 @@ class ProtectedActivity : AppCompatActivity() {
     private fun addProtectedToUI(name: String, connectionId: String) {
         val view = LayoutInflater.from(this).inflate(R.layout.item_user_connection, llProtectedList, false)
         view.findViewById<TextView>(R.id.tv_item_username).text = name
-        view.findViewById<TextView>(R.id.tv_item_status).text = "Ești gardianul lui"
+        view.findViewById<TextView>(R.id.tv_item_status).text = getString(R.string.you_are_guardian_of)
         
         // Ascundem switch-ul de locație în ecranul de protejați (nu are sens aici pentru gardian)
         view.findViewById<View>(R.id.sw_share_location).visibility = View.GONE
 
         view.findViewById<ImageButton>(R.id.btn_remove_connection).setOnClickListener {
             db.collection("connections").document(connectionId).delete()
-                .addOnSuccessListener { Toast.makeText(this, "Nu mai ești gardianul lui $name", Toast.LENGTH_SHORT).show() }
+                .addOnSuccessListener { Toast.makeText(this, getString(R.string.no_longer_guardian_format, name), Toast.LENGTH_SHORT).show() }
         }
         
         llProtectedList.addView(view)

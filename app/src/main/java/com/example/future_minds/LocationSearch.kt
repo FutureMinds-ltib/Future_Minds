@@ -46,7 +46,7 @@ class LocationSearch(
         } else {
             searchBar.isEnabled = false
             searchButton.isEnabled = false
-            val warning = "Device location search is not available."
+            val warning = context.getString(R.string.location_search_not_available)
             searchBar.hint = warning
             Toast.makeText(context, warning, Toast.LENGTH_LONG).show()
         }
@@ -142,7 +142,7 @@ class LocationSearch(
         imm?.hideSoftInputFromWindow(searchBar.windowToken, 0)
         searchBar.dismissDropDown()
 
-        mainHandler.post { Toast.makeText(context, "Searching...", Toast.LENGTH_SHORT).show() }
+        mainHandler.post { Toast.makeText(context, context.getString(R.string.searching), Toast.LENGTH_SHORT).show() }
 
         executor.execute {
             try {
@@ -155,7 +155,7 @@ class LocationSearch(
                     val title = query.capitalize()
                     mainHandler.post { zoomToLocation(point, title) }
                 } else {
-                    mainHandler.post { Toast.makeText(context, "Location not found.", Toast.LENGTH_LONG).show() }
+                    mainHandler.post { Toast.makeText(context, context.getString(R.string.location_not_found), Toast.LENGTH_LONG).show() }
                 }
             } catch (e: Exception) {
                 Log.e("LocationSearch", "Search error", e)

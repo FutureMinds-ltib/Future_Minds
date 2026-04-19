@@ -42,7 +42,7 @@ class LoginActivity : AppCompatActivity() {
                         goToMapScreen()
                     } else {
                         val errorMsg = task.exception?.message ?: "Unknown error"
-                        Toast.makeText(this, "Guest Login Failed: $errorMsg", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, getString(R.string.guest_login_failed) + ": $errorMsg", Toast.LENGTH_LONG).show()
                     }
                 }
         }
@@ -60,15 +60,15 @@ class LoginActivity : AppCompatActivity() {
                             if (user != null && (user.isEmailVerified || user.isAnonymous)) {
                                 goToMapScreen()
                             } else {
-                                Toast.makeText(this, "Vă rugăm să vă verificați adresa de email!", Toast.LENGTH_LONG).show()
+                                Toast.makeText(this, getString(R.string.verify_email_msg), Toast.LENGTH_LONG).show()
                                 auth.signOut()
                             }
                         } else {
-                            Toast.makeText(this, "Login Failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this, getString(R.string.login_failed_format, task.exception?.message), Toast.LENGTH_SHORT).show()
                         }
                     }
             } else {
-                Toast.makeText(this, "Completati toate campurile!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.fill_all_fields), Toast.LENGTH_SHORT).show()
             }
         }
 

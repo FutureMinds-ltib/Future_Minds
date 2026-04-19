@@ -43,11 +43,11 @@ class GuardianActivity : AppCompatActivity() {
                         // PAS 2: Dacă eu sunt OK, verificăm și gardianul
                         checkGuardianExists(gUsername, gPhone)
                     } else {
-                        Toast.makeText(this, "Numărul tău de telefon nu este confirmat! Verifică-l în 'Date Personale'.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, getString(R.string.phone_not_confirmed_msg), Toast.LENGTH_LONG).show()
                     }
                 }
             } else {
-                Toast.makeText(this, "Completează toate câmpurile!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.fill_all_fields), Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -92,7 +92,7 @@ class GuardianActivity : AppCompatActivity() {
         val view = LayoutInflater.from(this).inflate(R.layout.item_user_connection, llGuardiansList, false)
         val ivProfile = view.findViewById<ImageView>(R.id.iv_connection_profile)
         view.findViewById<TextView>(R.id.tv_item_username).text = name
-        view.findViewById<TextView>(R.id.tv_item_status).text = "Status: $status"
+        view.findViewById<TextView>(R.id.tv_item_status).text = getString(R.string.status_format, status)
         
         @SuppressLint("UseSwitchCompatOrMaterialCode")
         val swShare = view.findViewById<androidx.appcompat.widget.SwitchCompat>(R.id.sw_share_location)
@@ -115,7 +115,7 @@ class GuardianActivity : AppCompatActivity() {
         
         view.findViewById<ImageButton>(R.id.btn_remove_connection).setOnClickListener {
             db.collection("connections").document(connectionId).delete()
-                .addOnSuccessListener { Toast.makeText(this, "Gardian eliminat", Toast.LENGTH_SHORT).show() }
+                .addOnSuccessListener { Toast.makeText(this, getString(R.string.guardian_removed), Toast.LENGTH_SHORT).show() }
         }
         
         llGuardiansList.addView(view)
@@ -136,13 +136,13 @@ class GuardianActivity : AppCompatActivity() {
                         if (isPhoneVerified) {
                             sendGuardianRequest(guardianUid, username)
                         } else {
-                            Toast.makeText(this, "Utilizatorul $username nu poate fi adăugat ca gardian deoarece nu are numărul de telefon confirmat.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this, getString(R.string.guardian_no_phone_verified, username), Toast.LENGTH_LONG).show()
                         }
                     } else {
-                        Toast.makeText(this, "Numărul de telefon nu corespunde!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, getString(R.string.phone_mismatch), Toast.LENGTH_LONG).show()
                     }
                 } else {
-                    Toast.makeText(this, "Username-ul nu a fost găsit!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, getString(R.string.username_not_found), Toast.LENGTH_LONG).show()
                 }
             }
     }
@@ -166,14 +166,14 @@ class GuardianActivity : AppCompatActivity() {
                     )
                     
                     db.collection("users").document(currentUser.uid).get().addOnSuccessListener { myDoc ->
-                        connection["protectedUsername"] = myDoc.getString("username") ?: "User"
+                        connection["protectedUsername"] = myDoc.getString("username") ?: getString(R.string.guest_user)
                         db.collection("connections").add(connection)
                             .addOnSuccessListener {
-                                Toast.makeText(this, "Cerere trimisă!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(this, getString(R.string.request_sent), Toast.LENGTH_SHORT).show()
                             }
                     }
                 } else {
-                    Toast.makeText(this, "Există deja o conexiune!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.already_connected), Toast.LENGTH_SHORT).show()
                 }
             }
     }

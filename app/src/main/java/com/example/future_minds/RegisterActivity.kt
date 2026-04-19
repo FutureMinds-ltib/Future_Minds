@@ -57,16 +57,16 @@ class RegisterActivity : AppCompatActivity() {
                                         user.sendEmailVerification()
                                             .addOnCompleteListener { verifyTask ->
                                                 if (verifyTask.isSuccessful) {
-                                                    Toast.makeText(this, "Cont creat! Verifică email-ul pentru confirmare.", Toast.LENGTH_LONG).show()
+                                                    Toast.makeText(this, getString(R.string.account_created_verify), Toast.LENGTH_LONG).show()
                                                     auth.signOut()
                                                     finish()
                                                 } else {
-                                                    Toast.makeText(this, "Eroare la trimiterea email-ului de verificare.", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(this, getString(R.string.error_sending_verification), Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                     }
                                     .addOnFailureListener { e ->
-                                        Toast.makeText(this, "Eroare la salvarea datelor: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this, getString(R.string.error_saving_data) + ": ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
                             }
                         } else {
@@ -74,7 +74,7 @@ class RegisterActivity : AppCompatActivity() {
                         }
                     }
             } else {
-                Toast.makeText(this, "Completati toate campurile, inclusiv numarul de telefon!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.fill_all_fields), Toast.LENGTH_SHORT).show()
             }
         }
 

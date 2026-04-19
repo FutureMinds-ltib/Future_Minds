@@ -16,7 +16,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Gardienii Tăi"
+            android:text="@string/your_guardian"
             android:textColor="@color/text_dark"
             android:textSize="26sp"
             android:textStyle="bold"
@@ -52,7 +52,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Adaugă un gardian nou"
+                    android:text="@string/add_guardian"
                     android:textColor="@color/primary_blue"
                     android:textSize="18sp"
                     android:textStyle="bold" />
@@ -65,7 +65,7 @@
                     android:background="@drawable/bg_rounded_input"
                     android:drawableStart="@android:drawable/ic_menu_edit"
                     android:drawablePadding="12dp"
-                    android:hint="Username Gardian"
+                    android:hint="@string/name_hint"
                     android:inputType="textPersonName"
                     android:paddingHorizontal="20dp" />
 
@@ -77,7 +77,7 @@
                     android:background="@drawable/bg_rounded_input"
                     android:drawableStart="@android:drawable/ic_menu_call"
                     android:drawablePadding="12dp"
-                    android:hint="Număr de Telefon"
+                    android:hint="@string/phone_number"
                     android:inputType="phone"
                     android:paddingHorizontal="20dp" />
 
@@ -87,7 +87,7 @@
                     android:layout_height="60dp"
                     android:layout_marginTop="20dp"
                     android:background="@drawable/bg_primary_button"
-                    android:text="Trimite Cerere"
+                    android:text="@string/submit_report"
                     android:textAllCaps="false"
                     android:textColor="@color/white"
                     android:textSize="18sp"
@@ -103,7 +103,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:layout_marginBottom="24dp"
-            android:text="← Înapoi"
+            android:text="@string/back_btn"
             android:textColor="@color/text_gray"
             android:textStyle="bold"
             app:layout_constraintBottom_toBottomOf="parent"
